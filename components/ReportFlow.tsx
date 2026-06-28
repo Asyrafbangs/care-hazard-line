@@ -5,20 +5,34 @@ import { Camera, CheckCircle2, HelpCircle, MapPin, Sparkles, UserRound } from "l
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { locations } from "@/lib/dummy-data";
-import type { HazardSummary, ReporterCategory } from "@/types/domain";
+import { languages } from "@/lib/i18n";
+import type { HazardSummary, LanguageCode, ReporterCategory } from "@/types/domain";
 
 const initialSummary: HazardSummary | null = null;
 
+type SubmitResponse = {
+  ok: boolean;
+  reportNo?: string;
+  status?: string;
+  photoMode?: string;
+  error?: string;
+};
+
 export function ReportFlow() {
   const [step, setStep] = useState(1);
+  const [language, setLanguage] = useState<LanguageCode>("en");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [category, setCategory] = useState<ReporterCategory>("employee");
+  const [employeeId, setEmployeeId] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [description, setDescription] = useState("");
   const [photoName, setPhotoName] = useState("");
   const [location, setLocation] = useState(locations[0]?.name ?? "");
   const [summary, setSummary] = useState<HazardSummary | null>(initialSummary);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [submittedReportNo, setSubmittedReportNo] = useState("");
 
   const canContinueIdentity = name.trim().length > 1 && phone.trim().length > 5;
@@ -28,21 +42,76 @@ export function ReportFlow() {
 
   async function generateAiSummary() {
     setIsLoadingAi(true);
-    const response = await fetch("/api/ai/hazard-summary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description, location, photoUrl: photoName })
-    });
-    const result = (await response.json()) as HazardSummary;
-    setSummary(result);
-    setIsLoadingAi(false);
-    setStep(4);
+    setSubmitError("");
+
+    try {
+      const response = await fetch("/api/ai/hazard-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, location, photoUrl: photoName })
+      });
+      const result = (await response.json()) as HazardSummary;
+      setSummary(result);
+      setStep(4);
+    } catch {
+      setSummary({
+        hazardSummary: description,
+        suggestedCategory: "Other",
+        urgencyLevel: "medium",
+        recommendedImmediateAction: "EHS to review and advise immediate control.",
+        suggestedOwnerDepartment: "EHS review required",
+        aiStatus: "failed"
+      });
+      setStep(4);
+    } finally {
+      setIsLoadingAi(false);
+    }
   }
 
-  function submitReport() {
-    const runningNo = Math.floor(Math.random() * 9000 + 1000);
-    setSubmittedReportNo(`HZ-2026-${runningNo}`);
-    setStep(5);
+  async function submitReport() {
+    if (!summary) return;
+
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const response = await fetch("/api/reports/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reporter: {
+            name,
+            phoneNumber: phone,
+            category,
+            employeeId: employeeId || null,
+            companyName: companyName || null,
+            preferredLanguage: language,
+            identityVisibility: "ehs_only"
+          },
+          report: {
+            description,
+            locationName: location,
+            locationText: location,
+            photoName,
+            aiSummary: summary,
+            reporterConfirmedAiSummary: true
+          }
+        })
+      });
+
+      const result = (await response.json()) as SubmitResponse;
+
+      if (!response.ok || !result.ok || !result.reportNo) {
+        throw new Error(result.error ?? "Report submission failed.");
+      }
+
+      setSubmittedReportNo(result.reportNo);
+      setStep(5);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Report submission failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -63,12 +132,22 @@ export function ReportFlow() {
           <h2 className="text-xl font-bold">Reporter details</h2>
           <p className="mt-1 text-sm text-slate-600">First-time user provides basic details. Returning users will be recognized by phone number later.</p>
           <div className="mt-5 space-y-3">
+            <label className="block text-sm font-semibold">Preferred language
+              <select className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" value={language} onChange={(event) => setLanguage(event.target.value as LanguageCode)}>
+                {languages.map((item) => <option key={item.code} value={item.code}>{item.nativeLabel} - {item.label}</option>)}
+              </select>
+            </label>
             <label className="block text-sm font-semibold">Name<input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" /></label>
             <label className="block text-sm font-semibold">Phone number<input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Example: 60123456789" /></label>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setCategory("employee")} className={`rounded-2xl border p-3 text-sm font-semibold ${category === "employee" ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200"}`}>Employee</button>
               <button onClick={() => setCategory("visitor")} className={`rounded-2xl border p-3 text-sm font-semibold ${category === "visitor" ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200"}`}>Visitor</button>
             </div>
+            {category === "employee" ? (
+              <label className="block text-sm font-semibold">Employee ID <span className="text-xs font-normal text-slate-500">optional for Phase 2A</span><input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} placeholder="Example: EMP001" /></label>
+            ) : (
+              <label className="block text-sm font-semibold">Company name <span className="text-xs font-normal text-slate-500">optional for Phase 2A</span><input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Example: ABC Engineering" /></label>
+            )}
             <p className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">Privacy rule: EHS can see reporter details. Action owner cannot see reporter name or phone number.</p>
             <Button disabled={!canContinueIdentity} onClick={() => setStep(2)} className="w-full">Continue</Button>
           </div>
@@ -116,9 +195,10 @@ export function ReportFlow() {
             <Info label="Immediate action" value={summary.recommendedImmediateAction} />
             <Info label="Suggested owner / department" value={summary.suggestedOwnerDepartment} />
             {summary.aiStatus !== "completed" ? <p className="rounded-2xl bg-amber-50 p-3 text-amber-800">AI status: {summary.aiStatus}. EHS will verify before final action.</p> : null}
+            {submitError ? <p className="rounded-2xl bg-red-50 p-3 text-red-800">{submitError}</p> : null}
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="secondary" onClick={() => setStep(2)}>Correct</Button>
-              <Button onClick={submitReport}>Accept & Submit</Button>
+              <Button variant="secondary" onClick={() => setStep(2)} disabled={isSubmitting}>Correct</Button>
+              <Button onClick={submitReport} disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Accept & Submit"}</Button>
             </div>
           </div>
         </Card>
@@ -128,7 +208,7 @@ export function ReportFlow() {
         <Card>
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-safety-green"><CheckCircle2 /></div>
           <h2 className="text-xl font-bold">Report submitted</h2>
-          <p className="mt-2 text-sm text-slate-600">Demo submission completed. In Phase 2 this will write to Supabase and upload the photo to Cloudinary.</p>
+          <p className="mt-2 text-sm text-slate-600">Your report has been saved in Supabase. Photo is recorded as pending Cloudinary upload in Phase 2A.</p>
           <p className="mt-4 rounded-2xl bg-green-50 p-4 text-center text-xl font-bold text-safety-green">{submittedReportNo}</p>
           <Button onClick={() => window.location.reload()} className="mt-4 w-full">Submit another report</Button>
         </Card>
