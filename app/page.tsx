@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Camera, Languages, ShieldCheck, Sparkles } from "lucide-react";
+import { Camera, Languages, ShieldCheck, Sparkles, UserCheck } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -22,6 +22,11 @@ export default function HomePage() {
           <Link href="/auth/login">
             <Button variant="secondary" className="w-full gap-2">
               <ShieldCheck size={18} /> EHS / Action Owner Login
+            </Button>
+          </Link>
+          <Link href="/actions">
+            <Button variant="secondary" className="w-full gap-2">
+              <UserCheck size={18} /> Action Owner Dashboard
             </Button>
           </Link>
         </div>
