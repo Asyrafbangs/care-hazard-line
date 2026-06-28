@@ -1,0 +1,16 @@
+{
+  "name": "CARE Hazard Line",
+  "short_name": "CARE Hazard",
+  "description": "Simple hazard reporting and EHS action tracking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#16803c",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
