@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
 import { statusLabel } from "@/lib/status";
 
@@ -24,19 +25,22 @@ export function ReportCard({
   status: ReportStatus;
 }) {
   return (
-    <article className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-100">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold text-slate-500">{reportNo}</p>
-          <h3 className="mt-1 text-base font-bold text-safety-ink">{summary}</h3>
+    <Link href={`/dashboard/reports/${encodeURIComponent(reportNo)}`} className="block rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:ring-safety-green/30">
+      <article>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold text-slate-500">{reportNo}</p>
+            <h3 className="mt-1 text-base font-bold text-safety-ink">{summary}</h3>
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${urgencyStyle[urgency]}`}>{urgency}</span>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${urgencyStyle[urgency]}`}>{urgency}</span>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-        <p><span className="font-semibold">Location:</span> {location}</p>
-        <p><span className="font-semibold">Category:</span> {category}</p>
-        <p className="col-span-2"><span className="font-semibold">Status:</span> {statusLabel(status)}</p>
-      </div>
-    </article>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+          <p><span className="font-semibold">Location:</span> {location}</p>
+          <p><span className="font-semibold">Category:</span> {category}</p>
+          <p className="col-span-2"><span className="font-semibold">Status:</span> {statusLabel(status)}</p>
+        </div>
+        <p className="mt-3 text-xs font-semibold text-safety-green">Open secure report detail →</p>
+      </article>
+    </Link>
   );
 }
