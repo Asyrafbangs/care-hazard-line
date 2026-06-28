@@ -113,10 +113,10 @@ export default async function DashboardPage() {
             </div>
           </Card>
           <Card>
-            <h2 className="text-lg font-bold">Phase 2A status</h2>
+            <h2 className="text-lg font-bold">Phase 2B status</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-700">
               <p>Database reporting: <strong>enabled</strong></p>
-              <p>Photo storage: <strong>pending Cloudinary setup</strong></p>
+              <p>Photo storage: <strong>Supabase Storage enabled</strong></p>
               <p>Dashboard source: <strong>{source}</strong></p>
             </div>
           </Card>

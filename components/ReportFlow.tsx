@@ -10,6 +10,21 @@ import type { HazardSummary, LanguageCode, ReporterCategory } from "@/types/doma
 
 const initialSummary: HazardSummary | null = null;
 
+type UploadedPhoto = {
+  provider: "supabase";
+  bucket: string;
+  path: string;
+  signedUrl?: string | null;
+  originalFileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
+type UploadResponse = {
+  ok: boolean;
+  error?: string;
+} & Partial<UploadedPhoto>;
+
 type SubmitResponse = {
   ok: boolean;
   reportNo?: string;
@@ -27,7 +42,7 @@ export function ReportFlow() {
   const [employeeId, setEmployeeId] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [description, setDescription] = useState("");
-  const [photoName, setPhotoName] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [location, setLocation] = useState(locations[0]?.name ?? "");
   const [summary, setSummary] = useState<HazardSummary | null>(initialSummary);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
@@ -36,7 +51,7 @@ export function ReportFlow() {
   const [submittedReportNo, setSubmittedReportNo] = useState("");
 
   const canContinueIdentity = name.trim().length > 1 && phone.trim().length > 5;
-  const canGenerateAi = description.trim().length > 3 && photoName.trim().length > 0 && location.trim().length > 0;
+  const canGenerateAi = description.trim().length > 3 && Boolean(photoFile) && location.trim().length > 0;
 
   const progressLabel = useMemo(() => `Step ${step} of 5`, [step]);
 
@@ -48,7 +63,7 @@ export function ReportFlow() {
       const response = await fetch("/api/ai/hazard-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, location, photoUrl: photoName })
+        body: JSON.stringify({ description, location, photoUrl: photoFile?.name ?? "photo-selected" })
       });
       const result = (await response.json()) as HazardSummary;
       setSummary(result);
@@ -68,13 +83,46 @@ export function ReportFlow() {
     }
   }
 
+  async function uploadHazardPhoto(file: File): Promise<UploadedPhoto> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/storage/hazard-photo", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = (await response.json()) as UploadResponse;
+
+    if (!response.ok || !result.ok || !result.bucket || !result.path || !result.originalFileName || !result.mimeType || !result.sizeBytes) {
+      throw new Error(result.error ?? "Photo upload failed.");
+    }
+
+    return {
+      provider: "supabase",
+      bucket: result.bucket,
+      path: result.path,
+      signedUrl: result.signedUrl ?? null,
+      originalFileName: result.originalFileName,
+      mimeType: result.mimeType,
+      sizeBytes: result.sizeBytes
+    };
+  }
+
   async function submitReport() {
     if (!summary) return;
+
+    if (!photoFile) {
+      setSubmitError("Please attach one hazard photo before submitting.");
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmitError("");
 
     try {
+      const uploadedPhoto = await uploadHazardPhoto(photoFile);
+
       const response = await fetch("/api/reports/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,7 +140,7 @@ export function ReportFlow() {
             description,
             locationName: location,
             locationText: location,
-            photoName,
+            photo: uploadedPhoto,
             aiSummary: summary,
             reporterConfirmedAiSummary: true
           }
@@ -144,9 +192,9 @@ export function ReportFlow() {
               <button onClick={() => setCategory("visitor")} className={`rounded-2xl border p-3 text-sm font-semibold ${category === "visitor" ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200"}`}>Visitor</button>
             </div>
             {category === "employee" ? (
-              <label className="block text-sm font-semibold">Employee ID <span className="text-xs font-normal text-slate-500">optional for Phase 2A</span><input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} placeholder="Example: EMP001" /></label>
+              <label className="block text-sm font-semibold">Employee ID <span className="text-xs font-normal text-slate-500">optional for Phase 2</span><input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} placeholder="Example: EMP001" /></label>
             ) : (
-              <label className="block text-sm font-semibold">Company name <span className="text-xs font-normal text-slate-500">optional for Phase 2A</span><input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Example: ABC Engineering" /></label>
+              <label className="block text-sm font-semibold">Company name <span className="text-xs font-normal text-slate-500">optional for Phase 2</span><input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Example: ABC Engineering" /></label>
             )}
             <p className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">Privacy rule: EHS can see reporter details. Action owner cannot see reporter name or phone number.</p>
             <Button disabled={!canContinueIdentity} onClick={() => setStep(2)} className="w-full">Continue</Button>
@@ -158,12 +206,12 @@ export function ReportFlow() {
         <Card>
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-safety-green"><Camera /></div>
           <h2 className="text-xl font-bold">Describe and attach photo</h2>
-          <p className="mt-1 text-sm text-slate-600">Keep it simple. Photo is mandatory.</p>
+          <p className="mt-1 text-sm text-slate-600">Keep it simple. Photo is mandatory and will be stored in private Supabase Storage.</p>
           <div className="mt-5 space-y-3">
             <label className="block text-sm font-semibold">Hazard description<textarea className="mt-1 min-h-28 w-full rounded-2xl border border-slate-200 px-4 py-3" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Example: Pallet blocking walkway near loading area" /></label>
-            <label className="block text-sm font-semibold">Hazard photo<input className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" type="file" accept="image/*" capture="environment" onChange={(event) => setPhotoName(event.target.files?.[0]?.name ?? "")} /></label>
-            {photoName ? <p className="rounded-2xl bg-green-50 p-3 text-sm text-green-800">Photo selected: {photoName}</p> : <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">Photo is required before AI review.</p>}
-            <Button disabled={!description.trim() || !photoName} onClick={() => setStep(3)} className="w-full">Continue</Button>
+            <label className="block text-sm font-semibold">Hazard photo<input className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" type="file" accept="image/*" capture="environment" onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)} /></label>
+            {photoFile ? <p className="rounded-2xl bg-green-50 p-3 text-sm text-green-800">Photo selected: {photoFile.name}</p> : <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">Photo is required before AI review.</p>}
+            <Button disabled={!description.trim() || !photoFile} onClick={() => setStep(3)} className="w-full">Continue</Button>
           </div>
         </Card>
       ) : null}
@@ -198,7 +246,7 @@ export function ReportFlow() {
             {submitError ? <p className="rounded-2xl bg-red-50 p-3 text-red-800">{submitError}</p> : null}
             <div className="grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => setStep(2)} disabled={isSubmitting}>Correct</Button>
-              <Button onClick={submitReport} disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Accept & Submit"}</Button>
+              <Button onClick={submitReport} disabled={isSubmitting}>{isSubmitting ? "Uploading..." : "Accept & Submit"}</Button>
             </div>
           </div>
         </Card>
@@ -208,7 +256,7 @@ export function ReportFlow() {
         <Card>
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-safety-green"><CheckCircle2 /></div>
           <h2 className="text-xl font-bold">Report submitted</h2>
-          <p className="mt-2 text-sm text-slate-600">Your report has been saved in Supabase. Photo is recorded as pending Cloudinary upload in Phase 2A.</p>
+          <p className="mt-2 text-sm text-slate-600">Your report and hazard photo have been saved in Supabase.</p>
           <p className="mt-4 rounded-2xl bg-green-50 p-4 text-center text-xl font-bold text-safety-green">{submittedReportNo}</p>
           <Button onClick={() => window.location.reload()} className="mt-4 w-full">Submit another report</Button>
         </Card>

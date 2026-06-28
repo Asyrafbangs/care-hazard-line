@@ -17,7 +17,15 @@ const submitSchema = z.object({
     description: z.string().trim().min(4),
     locationName: z.string().trim().min(1),
     locationText: z.string().trim().optional().nullable(),
-    photoName: z.string().trim().min(1),
+    photo: z.object({
+      provider: z.literal("supabase"),
+      bucket: z.string().trim().min(1),
+      path: z.string().trim().min(1),
+      signedUrl: z.string().trim().optional().nullable(),
+      originalFileName: z.string().trim().min(1),
+      mimeType: z.string().trim().min(1),
+      sizeBytes: z.number().int().positive()
+    }),
     aiSummary: z.object({
       hazardSummary: z.string().trim().min(1),
       suggestedCategory: z.string().trim().min(1),
@@ -109,13 +117,16 @@ export async function POST(request: Request) {
       throw new Error(reportError?.message ?? "Report could not be created.");
     }
 
-    // Phase 2A stores a mandatory placeholder photo reference first.
-    // Phase 2B will replace this with a real Cloudinary public ID and secure URL.
-    const safePhotoName = payload.report.photoName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const { error: photoError } = await supabase.from("hazard_photos").insert({
       report_id: report.id,
-      cloudinary_public_id: `phase-2a-pending/${report.report_no}/${safePhotoName}`,
-      cloudinary_url: `pending-cloudinary://${report.report_no}/${safePhotoName}`,
+      storage_provider: "supabase",
+      supabase_bucket: payload.report.photo.bucket,
+      supabase_storage_path: payload.report.photo.path,
+      original_file_name: payload.report.photo.originalFileName,
+      mime_type: payload.report.photo.mimeType,
+      size_bytes: payload.report.photo.sizeBytes,
+      cloudinary_public_id: null,
+      cloudinary_url: null,
       photo_type: "hazard",
       uploaded_by_reporter_id: reporter.id
     });
@@ -129,7 +140,7 @@ export async function POST(request: Request) {
       old_status: "draft",
       new_status: "submitted",
       changed_by_reporter_id: reporter.id,
-      comment: "Reporter accepted AI summary and submitted through web reporting flow."
+      comment: "Reporter accepted AI summary and submitted through web reporting flow. Photo stored in Supabase Storage."
     });
 
     if (["high", "urgent"].includes(payload.report.aiSummary.urgencyLevel)) {
@@ -154,7 +165,7 @@ export async function POST(request: Request) {
       reportNo: report.report_no,
       status: report.status,
       reporterId: reporter.id,
-      photoMode: "pending_cloudinary"
+      photoMode: "supabase_storage"
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
