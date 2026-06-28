@@ -115,6 +115,7 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
   const urgency = action.final_urgency ?? action.ai_urgency ?? "medium";
   const location = action.location_name ? `${action.location_area ?? ""} - ${action.location_name}` : action.location_text ?? "Location not set";
   const hazardPhoto = photos.find((photo) => photo.photo_type === "hazard" && photo.supabase_storage_path);
+  const closurePhotos = photos.filter((photo) => photo.photo_type === "closure" && photo.supabase_storage_path);
   const isOverdue = new Date(action.due_date) < new Date() && !["closed", "cancelled"].includes(action.assignment_status);
 
   return (
@@ -183,6 +184,27 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
             <Card>
               <h2 className="text-lg font-bold">No hazard photo available</h2>
               <p className="mt-2 text-sm text-slate-600">This report may have been created before Supabase Storage upload was enabled.</p>
+            </Card>
+          )}
+
+          <Card>
+            <h2 className="text-lg font-bold">Closure evidence</h2>
+            <p className="mt-2 text-sm text-slate-600">Closure evidence uploaded by the action owner is stored privately and can be viewed with a temporary signed URL.</p>
+          </Card>
+
+          {closurePhotos.length > 0 ? closurePhotos.map((photo) => (
+            <SecurePhotoPreview
+              key={photo.id}
+              reportNo={action.report_no}
+              photoId={photo.id}
+              photoType="closure"
+              viewerRole="action_owner"
+              fileName={photo.original_file_name}
+            />
+          )) : (
+            <Card>
+              <h2 className="text-lg font-bold">No closure evidence yet</h2>
+              <p className="mt-2 text-sm text-slate-600">Closure evidence will appear here after the action owner submits the action for EHS verification.</p>
             </Card>
           )}
 

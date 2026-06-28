@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Database, Filter, Settings } from "lucide-react";
+import { Bell, Database, Filter, Settings, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/Card";
 import { MetricCard } from "@/components/MetricCard";
 import { ReportCard } from "@/components/ReportCard";
@@ -69,6 +69,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/dashboard/verification"><ShieldCheck className="mr-2 inline" size={16} />Verification</Link>
           <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/settings"><Settings className="mr-2 inline" size={16} />Settings</Link>
           <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green" href="/reports/new">New Report</Link>
         </div>
@@ -113,10 +114,12 @@ export default async function DashboardPage() {
             </div>
           </Card>
           <Card>
-            <h2 className="text-lg font-bold">Phase 2B status</h2>
+            <h2 className="text-lg font-bold">Phase 3C status</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-700">
               <p>Database reporting: <strong>enabled</strong></p>
               <p>Photo storage: <strong>Supabase Storage enabled</strong></p>
+              <p>Closure evidence: <strong>enabled</strong></p>
+              <p>EHS verification: <strong>enabled</strong></p>
               <p>Dashboard source: <strong>{source}</strong></p>
             </div>
           </Card>

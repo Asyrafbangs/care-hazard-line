@@ -2,17 +2,32 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
+const closurePhotoSchema = z.object({
+  provider: z.literal("supabase"),
+  bucket: z.string().trim().min(1),
+  path: z.string().trim().min(1),
+  signedUrl: z.string().trim().optional().nullable(),
+  originalFileName: z.string().trim().min(1),
+  mimeType: z.string().trim().min(1),
+  sizeBytes: z.number().int().positive()
+});
+
 const actionUpdateSchema = z.object({
   assignmentId: z.string().uuid(),
   status: z.enum(["in_progress", "pending_verification"]),
   comment: z.string().trim().min(3, "Comment is required.").max(2000),
-  updatedByUserId: z.string().uuid().optional().nullable()
+  updatedByUserId: z.string().uuid().optional().nullable(),
+  closurePhoto: closurePhotoSchema.optional().nullable()
 });
 
 export async function POST(request: Request) {
   try {
     const payload = actionUpdateSchema.parse(await request.json());
     const supabase = createSupabaseAdmin();
+
+    if (payload.status === "pending_verification" && !payload.closurePhoto) {
+      return NextResponse.json({ ok: false, error: "Closure evidence photo is required before EHS verification." }, { status: 400 });
+    }
 
     const { data: assignment, error: assignmentError } = await supabase
       .from("report_assignments")
@@ -50,6 +65,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "This report is already closed or cancelled." }, { status: 409 });
     }
 
+    let closurePhotoId: string | null = null;
+
+    if (payload.status === "pending_verification" && payload.closurePhoto) {
+      const { data: closurePhoto, error: closurePhotoError } = await supabase
+        .from("hazard_photos")
+        .insert({
+          report_id: report.id,
+          storage_provider: "supabase",
+          supabase_bucket: payload.closurePhoto.bucket,
+          supabase_storage_path: payload.closurePhoto.path,
+          original_file_name: payload.closurePhoto.originalFileName,
+          mime_type: payload.closurePhoto.mimeType,
+          size_bytes: payload.closurePhoto.sizeBytes,
+          cloudinary_public_id: null,
+          cloudinary_url: null,
+          photo_type: "closure",
+          uploaded_by_user_id: payload.updatedByUserId ?? null
+        })
+        .select("id")
+        .single();
+
+      if (closurePhotoError || !closurePhoto) {
+        return NextResponse.json(
+          { ok: false, error: closurePhotoError?.message ?? "Closure photo record could not be saved." },
+          { status: 500 }
+        );
+      }
+
+      closurePhotoId = closurePhoto.id;
+    }
+
     const nextReportStatus = payload.status === "pending_verification" ? "pending_verification" : "in_progress";
     const previousReportStatus = report.status;
 
@@ -76,7 +122,7 @@ export async function POST(request: Request) {
       updated_by_user_id: payload.updatedByUserId ?? null,
       status: payload.status,
       comment: payload.comment,
-      closure_photo_id: null
+      closure_photo_id: closurePhotoId
     });
 
     if (actionUpdateError) {
@@ -90,7 +136,7 @@ export async function POST(request: Request) {
         new_status: nextReportStatus,
         changed_by_user_id: payload.updatedByUserId ?? null,
         comment: payload.status === "pending_verification"
-          ? "Action owner submitted the corrective action for EHS verification."
+          ? "Action owner submitted closure evidence for EHS verification."
           : "Action owner updated the corrective action progress."
       });
 
@@ -113,7 +159,7 @@ export async function POST(request: Request) {
         recipient_user_id: primaryEhs?.user_id ?? null,
         channel: "in_app",
         template_key: "action_pending_verification",
-        message_preview: `${report.report_no} is ready for EHS verification.`,
+        message_preview: `${report.report_no} is ready for EHS verification with closure evidence.`,
         status: "pending"
       });
     }
@@ -123,7 +169,8 @@ export async function POST(request: Request) {
       reportNo: report.report_no,
       assignmentId: assignment.id,
       assignmentStatus: payload.status,
-      reportStatus: nextReportStatus
+      reportStatus: nextReportStatus,
+      closurePhotoId
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

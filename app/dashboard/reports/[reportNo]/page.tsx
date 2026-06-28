@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, LockKeyhole, MapPin, Phone, Shi
 import { Card } from "@/components/Card";
 import { SecurePhotoPreview } from "@/components/SecurePhotoPreview";
 import { EhsAssignmentPanel } from "@/components/EhsAssignmentPanel";
+import { EhsVerificationPanel } from "@/components/EhsVerificationPanel";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { statusLabel } from "@/lib/status";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
@@ -76,12 +77,21 @@ type ExistingAssignment = {
   owner_email: string | null;
 } | null;
 
+type ActionUpdateRow = {
+  id: string;
+  status: ReportStatus;
+  comment: string | null;
+  closure_photo_id: string | null;
+  created_at: string;
+};
+
 async function getReport(reportNo: string): Promise<{
   report: ReportDetail | null;
   photos: PhotoRow[];
   actionOwners: ActionOwnerOption[];
   categories: CategoryOption[];
   assignment: ExistingAssignment;
+  actionUpdates: ActionUpdateRow[];
   error?: string;
 }> {
   try {
@@ -94,11 +104,11 @@ async function getReport(reportNo: string): Promise<{
       .maybeSingle();
 
     if (error) {
-      return { report: null, photos: [], actionOwners: [], categories: [], assignment: null, error: error.message };
+      return { report: null, photos: [], actionOwners: [], categories: [], assignment: null, actionUpdates: [], error: error.message };
     }
 
     if (!report) {
-      return { report: null, photos: [], actionOwners: [], categories: [], assignment: null, error: "Report not found." };
+      return { report: null, photos: [], actionOwners: [], categories: [], assignment: null, actionUpdates: [], error: "Report not found." };
     }
 
     const { data: photos, error: photoError } = await supabase
@@ -152,6 +162,15 @@ async function getReport(reportNo: string): Promise<{
       .maybeSingle();
 
     const assignmentOwner = assignmentRow ? actionOwners.find((owner) => owner.id === assignmentRow.action_owner_id) : null;
+
+    const { data: actionUpdates } = assignmentRow
+      ? await supabase
+          .from("action_updates")
+          .select("id, status, comment, closure_photo_id, created_at")
+          .eq("assignment_id", assignmentRow.id)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+
     const assignment: ExistingAssignment = assignmentRow ? {
       id: assignmentRow.id,
       action_owner_id: assignmentRow.action_owner_id,
@@ -173,6 +192,7 @@ async function getReport(reportNo: string): Promise<{
         suggestedOwnerDepartment: category.suggested_owner_department
       })),
       assignment,
+      actionUpdates: (actionUpdates ?? []) as ActionUpdateRow[],
       error: photoError?.message
     };
   } catch (error) {
@@ -182,6 +202,7 @@ async function getReport(reportNo: string): Promise<{
       actionOwners: [],
       categories: [],
       assignment: null,
+      actionUpdates: [],
       error: error instanceof Error ? error.message : "Unknown report loading error."
     };
   }
@@ -190,7 +211,7 @@ async function getReport(reportNo: string): Promise<{
 export default async function ReportDetailPage({ params }: { params: Promise<{ reportNo: string }> }) {
   const { reportNo } = await params;
   const decodedReportNo = decodeURIComponent(reportNo);
-  const { report, photos, actionOwners, categories, assignment, error } = await getReport(decodedReportNo);
+  const { report, photos, actionOwners, categories, assignment, actionUpdates, error } = await getReport(decodedReportNo);
 
   if (!report) {
     return (
@@ -207,6 +228,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
   const urgency = report.final_urgency ?? report.ai_urgency ?? "medium";
   const location = report.location_name ? `${report.location_area ?? ""} - ${report.location_name}` : report.location_text ?? "Location not set";
   const hazardPhoto = photos.find((photo) => photo.photo_type === "hazard" && photo.supabase_storage_path);
+  const closurePhotos = photos.filter((photo) => photo.photo_type === "closure" && photo.supabase_storage_path);
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
@@ -270,6 +292,29 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
             categories={categories}
             existingAssignment={assignment}
           />
+
+          {assignment ? (
+            <EhsVerificationPanel
+              reportNo={report.report_no}
+              assignmentId={assignment.id}
+              reportStatus={report.status}
+              assignmentStatus={assignment.status}
+            />
+          ) : null}
+
+          <Card>
+            <h2 className="text-lg font-bold">Action update history</h2>
+            <div className="mt-4 space-y-2 text-sm text-slate-700">
+              {actionUpdates.length > 0 ? actionUpdates.map((update) => (
+                <div key={update.id} className="rounded-2xl bg-slate-50 p-3">
+                  <p className="font-bold capitalize">{statusLabel(update.status)}</p>
+                  <p className="mt-1 text-slate-600">{update.comment ?? "No comment."}</p>
+                  {update.closure_photo_id ? <p className="mt-2 text-xs font-semibold text-safety-green">Closure photo attached</p> : null}
+                  <p className="mt-2 text-xs text-slate-400">{new Date(update.created_at).toLocaleString()}</p>
+                </div>
+              )) : <p>No action updates yet.</p>}
+            </div>
+          </Card>
         </div>
 
         <div className="space-y-4">
@@ -290,6 +335,27 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
             <Card>
               <h2 className="flex items-center gap-2 text-lg font-bold"><ShieldCheck size={20} />No secure photo available</h2>
               <p className="mt-2 text-sm text-slate-600">This report may have been created before Phase 2B Supabase Storage upload was enabled.</p>
+            </Card>
+          )}
+
+          <Card>
+            <h2 className="text-lg font-bold">Closure evidence for EHS review</h2>
+            <p className="mt-2 text-sm text-slate-600">Review closure photo evidence before accepting or reopening the action.</p>
+          </Card>
+
+          {closurePhotos.length > 0 ? closurePhotos.map((photo) => (
+            <SecurePhotoPreview
+              key={photo.id}
+              reportNo={report.report_no}
+              photoId={photo.id}
+              photoType="closure"
+              viewerRole="ehs"
+              fileName={photo.original_file_name}
+            />
+          )) : (
+            <Card>
+              <h2 className="text-lg font-bold">No closure evidence yet</h2>
+              <p className="mt-2 text-sm text-slate-600">Closure evidence appears here after the action owner submits the action for EHS verification.</p>
             </Card>
           )}
 
