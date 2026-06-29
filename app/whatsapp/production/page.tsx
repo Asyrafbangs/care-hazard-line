@@ -1,0 +1,25 @@
+import { MessageCircle } from "lucide-react";
+import { MobileShell } from "@/components/MobileShell";
+import { Card } from "@/components/Card";
+import { WhatsAppProductionPanel } from "@/components/WhatsAppProductionPanel";
+
+export default function WhatsAppProductionPage() {
+  return (
+    <MobileShell title="WhatsApp production" subtitle="Connect Meta Cloud API to CARE Hazard Line.">
+      <div className="space-y-4">
+        <Card>
+          <div className="flex gap-3">
+            <MessageCircle className="mt-1 text-safety-green" size={22} />
+            <div>
+              <h2 className="text-lg font-bold">Phase 5B setup console</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Use this page after deploying to Vercel. Localhost cannot be used as the Meta webhook callback URL.
+              </p>
+            </div>
+          </div>
+        </Card>
+        <WhatsAppProductionPanel />
+      </div>
+    </MobileShell>
+  );
+}

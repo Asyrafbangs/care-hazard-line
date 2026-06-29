@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Camera, Languages, MessageCircle, Search, ShieldCheck, Sparkles, UserCheck } from "lucide-react";
+import { Camera, Languages, MessageCircle, Search, ShieldCheck, Sparkles, UserCheck, Webhook } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -27,6 +27,11 @@ export default function HomePage() {
           <Link href="/whatsapp/simulator">
             <Button variant="secondary" className="w-full gap-2">
               <MessageCircle size={18} /> WhatsApp Bot Simulator
+            </Button>
+          </Link>
+          <Link href="/whatsapp/production">
+            <Button variant="secondary" className="w-full gap-2">
+              <Webhook size={18} /> WhatsApp Production Setup
             </Button>
           </Link>
           <Link href="/auth/login">
