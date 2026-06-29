@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, Clock3, LockKeyho
 import { Card } from "@/components/Card";
 import { SecurePhotoPreview } from "@/components/SecurePhotoPreview";
 import { ActionOwnerUpdatePanel } from "@/components/ActionOwnerUpdatePanel";
+import { getActionOwnerIdForUser, requireAppRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { statusLabel } from "@/lib/status";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
@@ -98,6 +99,8 @@ async function getActionDetail(assignmentId: string): Promise<{ action: ActionDe
 
 export default async function ActionDetailPage({ params }: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = await params;
+  const profile = await requireAppRole(["admin", "ehs", "action_owner"], `/actions/${assignmentId}`);
+  const currentOwnerId = profile.appUser.role === "action_owner" ? await getActionOwnerIdForUser(profile.appUser.id) : null;
   const { action, photos, updates, error } = await getActionDetail(assignmentId);
 
   if (!action) {
@@ -107,6 +110,18 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
         <Card>
           <h1 className="text-2xl font-bold">Action not found</h1>
           <p className="mt-2 text-sm text-slate-600">{error ?? "The action could not be loaded."}</p>
+        </Card>
+      </main>
+    );
+  }
+
+  if (profile.appUser.role === "action_owner" && action.action_owner_id !== currentOwnerId) {
+    return (
+      <main className="mx-auto min-h-screen max-w-5xl px-4 py-6">
+        <Link href="/actions" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to actions</Link>
+        <Card>
+          <h1 className="text-2xl font-bold">Action not visible</h1>
+          <p className="mt-2 text-sm text-slate-600">This action is not assigned to your action owner profile. Reporter privacy and assignment visibility are enforced.</p>
         </Card>
       </main>
     );
@@ -128,6 +143,7 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
           <div>
             <h1 className="text-3xl font-bold">{action.report_no}</h1>
             <p className="mt-2 max-w-3xl text-sm text-green-50">{action.ai_hazard_summary ?? action.original_description}</p>
+            <p className="mt-2 text-xs text-green-100">Signed in as {profile.appUser.name}</p>
           </div>
           <div className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold capitalize">{urgency}</div>
         </div>

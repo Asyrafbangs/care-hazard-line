@@ -4,6 +4,7 @@ import { Card } from "@/components/Card";
 import { MetricCard } from "@/components/MetricCard";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { statusLabel } from "@/lib/status";
+import { requireAppRole } from "@/lib/auth";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ async function getPendingVerification(): Promise<{ items: VerificationItem[]; er
 }
 
 export default async function EhsVerificationQueuePage() {
+  await requireAppRole(["admin", "ehs", "hod"], "/dashboard/verification");
   const { items, error } = await getPendingVerification();
   const highOrUrgent = items.filter((item) => ["high", "urgent"].includes(item.final_urgency ?? item.ai_urgency ?? "medium")).length;
   const overdue = items.filter((item) => new Date(item.due_date) < new Date()).length;

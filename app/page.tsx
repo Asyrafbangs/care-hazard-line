@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Camera, Languages, ShieldCheck, Sparkles, UserCheck } from "lucide-react";
+import { Camera, Languages, Search, ShieldCheck, Sparkles, UserCheck } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -17,6 +17,11 @@ export default function HomePage() {
           <Link href="/reports/new">
             <Button className="w-full gap-2">
               <Camera size={18} /> Report Hazard
+            </Button>
+          </Link>
+          <Link href="/track">
+            <Button variant="secondary" className="w-full gap-2">
+              <Search size={18} /> Track My Report
             </Button>
           </Link>
           <Link href="/auth/login">
@@ -41,7 +46,7 @@ export default function HomePage() {
           <div className="mt-4 grid gap-3 text-sm text-slate-700">
             <p className="flex gap-3"><Sparkles className="mt-0.5 shrink-0 text-safety-green" size={18} /> AI summary structure is ready with safe fallback.</p>
             <p className="flex gap-3"><Languages className="mt-0.5 shrink-0 text-safety-green" size={18} /> Language is stored at reporter level in the database design.</p>
-            <p className="flex gap-3"><ShieldCheck className="mt-0.5 shrink-0 text-safety-green" size={18} /> Action owner view hides reporter name and phone number. EHS verification now supports closure evidence review.</p>
+            <p className="flex gap-3"><ShieldCheck className="mt-0.5 shrink-0 text-safety-green" size={18} /> Role-based login is active for EHS and action owner pages. Action owner view hides reporter identity.</p>
           </div>
         </Card>
       </div>

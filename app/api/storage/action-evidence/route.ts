@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentAppUser } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -21,6 +22,11 @@ function getDateFolder() {
 
 export async function POST(request: Request) {
   try {
+    const profile = await getCurrentAppUser();
+    if (!profile || !["admin", "ehs", "action_owner"].includes(profile.appUser.role)) {
+      return NextResponse.json({ ok: false, error: "Action owner or EHS login is required to upload closure evidence." }, { status: 403 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 

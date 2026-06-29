@@ -4,6 +4,7 @@ import { Card } from "@/components/Card";
 import { MetricCard } from "@/components/MetricCard";
 import { ReportCard } from "@/components/ReportCard";
 import { sampleReports } from "@/lib/dummy-data";
+import { requireAppRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
 
@@ -53,6 +54,7 @@ async function getReports(): Promise<{ reports: DashboardReport[]; source: "supa
 }
 
 export default async function DashboardPage() {
+  const profile = await requireAppRole(["admin", "ehs", "hod"], "/dashboard");
   const { reports, source, error } = await getReports();
   const urgent = reports.filter((report) => report.urgency === "urgent" || report.urgency === "high").length;
   const newReports = reports.filter((report) => report.status === "submitted" || report.status === "ehs_review").length;
@@ -69,9 +71,10 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <span className="hidden rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold md:inline">{profile.appUser.name}</span>
           <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/dashboard/verification"><ShieldCheck className="mr-2 inline" size={16} />Verification</Link>
           <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/settings"><Settings className="mr-2 inline" size={16} />Settings</Link>
-          <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green" href="/reports/new">New Report</Link>
+          <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green" href="/auth/logout">Sign out</Link>
         </div>
       </header>
 
@@ -110,7 +113,7 @@ export default async function DashboardPage() {
             <div className="mt-4 space-y-3 text-sm text-slate-700">
               <p className="rounded-2xl bg-red-50 p-3 text-red-800">High-risk and urgent reports create pending EHS alert records.</p>
               <p className="rounded-2xl bg-amber-50 p-3 text-amber-800">Action owner visibility excludes reporter name and phone number.</p>
-              <p className="rounded-2xl bg-green-50 p-3 text-green-800">Closure update will be sent to reporter in Phase 5.</p>
+              <p className="rounded-2xl bg-green-50 p-3 text-green-800">Reporter progress tracking and closure update placeholders are enabled.</p>
             </div>
           </Card>
           <Card>

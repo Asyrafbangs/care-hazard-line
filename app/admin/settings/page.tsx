@@ -1,7 +1,11 @@
 import { Card } from "@/components/Card";
+import { requireAppRole } from "@/lib/auth";
 import { actionOwners, departments, ehsUsers, escalationRules, hazardCategories, locations } from "@/lib/dummy-data";
 
-export default function SettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  await requireAppRole(["admin", "ehs"], "/admin/settings");
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
       <header className="mb-6 rounded-3xl bg-white p-6 shadow-card ring-1 ring-slate-100">

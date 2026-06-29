@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getCurrentAppUser, isEhsRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 const verifySchema = z.object({
@@ -12,7 +13,13 @@ const verifySchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const profile = await getCurrentAppUser();
+    if (!profile || !isEhsRole(profile.appUser.role)) {
+      return NextResponse.json({ ok: false, error: "EHS role is required to verify reports." }, { status: 403 });
+    }
+
     const payload = verifySchema.parse(await request.json());
+    const verifiedByUserId = profile.appUser.id;
     const supabase = createSupabaseAdmin();
 
     const { data: report, error: reportError } = await supabase
@@ -79,7 +86,7 @@ export async function POST(request: Request) {
 
     const { error: actionUpdateError } = await supabase.from("action_updates").insert({
       assignment_id: assignment.id,
-      updated_by_user_id: payload.verifiedByUserId ?? null,
+      updated_by_user_id: verifiedByUserId,
       status: nextStatus,
       comment: payload.comment,
       closure_photo_id: null
@@ -97,7 +104,7 @@ export async function POST(request: Request) {
       report_id: report.id,
       old_status: previousReportStatus,
       new_status: nextStatus,
-      changed_by_user_id: payload.verifiedByUserId ?? null,
+      changed_by_user_id: verifiedByUserId,
       comment: historyComment
     });
 
@@ -115,6 +122,16 @@ export async function POST(request: Request) {
             channel: "in_app",
             template_key: "report_closed_update",
             message_preview: `${report.report_no} has been verified and closed by EHS.`,
+            status: "pending"
+          },
+          {
+            report_id: report.id,
+            recipient_type: "reporter",
+            recipient_reporter_id: report.reporter_id,
+            recipient_user_id: null,
+            channel: "whatsapp",
+            template_key: "report_closed_whatsapp_update",
+            message_preview: `${report.report_no} has been closed by EHS. Thank you for reporting.`,
             status: "pending"
           },
           {

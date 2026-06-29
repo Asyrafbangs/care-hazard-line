@@ -7,6 +7,7 @@ import { EhsAssignmentPanel } from "@/components/EhsAssignmentPanel";
 import { EhsVerificationPanel } from "@/components/EhsVerificationPanel";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { statusLabel } from "@/lib/status";
+import { requireAppRole } from "@/lib/auth";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -210,6 +211,7 @@ async function getReport(reportNo: string): Promise<{
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ reportNo: string }> }) {
   const { reportNo } = await params;
+  await requireAppRole(["admin", "ehs", "hod"], `/dashboard/reports/${encodeURIComponent(reportNo)}`);
   const decodedReportNo = decodeURIComponent(reportNo);
   const { report, photos, actionOwners, categories, assignment, actionUpdates, error } = await getReport(decodedReportNo);
 

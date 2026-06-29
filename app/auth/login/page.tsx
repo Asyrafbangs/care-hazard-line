@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { LockKeyhole } from "lucide-react";
 import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
+import { LoginForm } from "@/components/LoginForm";
 
 export default function LoginPage() {
   return (
@@ -12,21 +13,13 @@ export default function LoginPage() {
         </div>
         <h1 className="text-2xl font-bold">EHS Console Login</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Phase 1 provides the Supabase Auth structure. Connect your Supabase project and enable email/password login before production testing.
+          Sign in with Supabase email and password. Access is controlled by the role stored in the internal users table.
         </p>
-        <form className="mt-6 space-y-3">
-          <label className="block text-sm font-semibold">
-            Email
-            <input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" type="email" placeholder="ehs.admin@example.com" />
-          </label>
-          <label className="block text-sm font-semibold">
-            Password
-            <input className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3" type="password" placeholder="••••••••" />
-          </label>
-          <Button type="button" className="w-full">Sign in</Button>
-        </form>
-        <Link href="/dashboard" className="mt-4 block text-center text-sm font-semibold text-safety-green">
-          View demo dashboard without login
+        <Suspense fallback={<p className="mt-6 text-sm text-slate-600">Loading login form...</p>}>
+          <LoginForm />
+        </Suspense>
+        <Link href="/track" className="mt-4 block text-center text-sm font-semibold text-safety-green">
+          Reporter progress tracking
         </Link>
       </Card>
     </main>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getActionOwnerIdForUser, getCurrentAppUser, isEhsRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 const signedUrlSchema = z.object({
@@ -13,8 +14,17 @@ const SIGNED_URL_EXPIRY_SECONDS = 5 * 60;
 
 export async function POST(request: Request) {
   try {
+    const profile = await getCurrentAppUser();
+    if (!profile) {
+      return NextResponse.json({ ok: false, error: "Login is required to view secured photos." }, { status: 401 });
+    }
+
     const payload = signedUrlSchema.parse(await request.json());
     const supabase = createSupabaseAdmin();
+
+    if (payload.viewerRole === "ehs" && !isEhsRole(profile.appUser.role)) {
+      return NextResponse.json({ ok: false, error: "EHS role is required to view this photo." }, { status: 403 });
+    }
 
     // Phase 2C uses a role flag only because full Supabase Auth role enforcement starts later.
     // The important privacy rule is still maintained in the selected view:
@@ -34,6 +44,23 @@ export async function POST(request: Request) {
 
     if (!report) {
       return NextResponse.json({ ok: false, error: "Report not found or not visible to this role." }, { status: 404 });
+    }
+
+    if (payload.viewerRole === "action_owner" && profile.appUser.role === "action_owner") {
+      const currentOwnerId = await getActionOwnerIdForUser(profile.appUser.id);
+      const { data: visibleAssignment } = currentOwnerId
+        ? await supabase
+            .from("action_owner_report_detail")
+            .select("assignment_id")
+            .eq("report_no", payload.reportNo)
+            .eq("action_owner_id", currentOwnerId)
+            .not("assignment_id", "is", null)
+            .maybeSingle()
+        : { data: null };
+
+      if (!visibleAssignment) {
+        return NextResponse.json({ ok: false, error: "This photo is not visible to your action owner profile." }, { status: 403 });
+      }
     }
 
     let photoQuery = supabase

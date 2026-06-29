@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { getCurrentAppUser, isEhsRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET() {
   try {
+    const profile = await getCurrentAppUser();
+    if (!profile || !isEhsRole(profile.appUser.role)) {
+      return NextResponse.json({ ok: false, error: "EHS role is required to list reports." }, { status: 403 });
+    }
+
     const supabase = createSupabaseAdmin();
     const { data, error } = await supabase
       .from("ehs_report_detail")

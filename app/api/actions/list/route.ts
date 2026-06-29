@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
+import { getActionOwnerIdForUser, getCurrentAppUser } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(request: Request) {
   try {
+    const profile = await getCurrentAppUser();
+    if (!profile || !["admin", "ehs", "action_owner"].includes(profile.appUser.role)) {
+      return NextResponse.json({ ok: false, error: "Internal login is required to view actions." }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
-    const ownerId = searchParams.get("ownerId");
+    const requestedOwnerId = searchParams.get("ownerId");
+    const ownerId = profile.appUser.role === "action_owner" ? await getActionOwnerIdForUser(profile.appUser.id) : requestedOwnerId;
     const supabase = createSupabaseAdmin();
 
     let query = supabase

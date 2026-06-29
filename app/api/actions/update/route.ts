@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getActionOwnerIdForUser, getCurrentAppUser } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 const closurePhotoSchema = z.object({
@@ -22,7 +23,13 @@ const actionUpdateSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const profile = await getCurrentAppUser();
+    if (!profile || !["admin", "ehs", "action_owner"].includes(profile.appUser.role)) {
+      return NextResponse.json({ ok: false, error: "Action owner or EHS login is required." }, { status: 403 });
+    }
+
     const payload = actionUpdateSchema.parse(await request.json());
+    const updatedByUserId = profile.appUser.id;
     const supabase = createSupabaseAdmin();
 
     if (payload.status === "pending_verification" && !payload.closurePhoto) {
@@ -41,6 +48,13 @@ export async function POST(request: Request) {
 
     if (!assignment) {
       return NextResponse.json({ ok: false, error: "Assignment not found." }, { status: 404 });
+    }
+
+    if (profile.appUser.role === "action_owner") {
+      const currentOwnerId = await getActionOwnerIdForUser(profile.appUser.id);
+      if (!currentOwnerId || assignment.action_owner_id !== currentOwnerId) {
+        return NextResponse.json({ ok: false, error: "This action is not assigned to your action owner profile." }, { status: 403 });
+      }
     }
 
     if (["closed", "cancelled"].includes(assignment.status)) {
@@ -81,7 +95,7 @@ export async function POST(request: Request) {
           cloudinary_public_id: null,
           cloudinary_url: null,
           photo_type: "closure",
-          uploaded_by_user_id: payload.updatedByUserId ?? null
+          uploaded_by_user_id: updatedByUserId
         })
         .select("id")
         .single();
@@ -119,7 +133,7 @@ export async function POST(request: Request) {
 
     const { error: actionUpdateError } = await supabase.from("action_updates").insert({
       assignment_id: assignment.id,
-      updated_by_user_id: payload.updatedByUserId ?? null,
+      updated_by_user_id: updatedByUserId,
       status: payload.status,
       comment: payload.comment,
       closure_photo_id: closurePhotoId
@@ -134,7 +148,7 @@ export async function POST(request: Request) {
         report_id: report.id,
         old_status: previousReportStatus,
         new_status: nextReportStatus,
-        changed_by_user_id: payload.updatedByUserId ?? null,
+        changed_by_user_id: updatedByUserId,
         comment: payload.status === "pending_verification"
           ? "Action owner submitted closure evidence for EHS verification."
           : "Action owner updated the corrective action progress."

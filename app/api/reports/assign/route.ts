@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getCurrentAppUser, isEhsRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 const assignSchema = z.object({
@@ -15,7 +16,13 @@ const assignSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const profile = await getCurrentAppUser();
+    if (!profile || !isEhsRole(profile.appUser.role)) {
+      return NextResponse.json({ ok: false, error: "EHS role is required to assign reports." }, { status: 403 });
+    }
+
     const payload = assignSchema.parse(await request.json());
+    const assignedByUserId = profile.appUser.id;
     const supabase = createSupabaseAdmin();
 
     const { data: report, error: reportError } = await supabase
@@ -76,7 +83,7 @@ export async function POST(request: Request) {
         .from("report_assignments")
         .update({
           action_owner_id: payload.actionOwnerId,
-          assigned_by_user_id: payload.assignedByUserId ?? null,
+          assigned_by_user_id: assignedByUserId,
           action_required: payload.actionRequired,
           due_date: payload.dueDate,
           status: "assigned",
@@ -97,7 +104,7 @@ export async function POST(request: Request) {
         .insert({
           report_id: report.id,
           action_owner_id: payload.actionOwnerId,
-          assigned_by_user_id: payload.assignedByUserId ?? null,
+          assigned_by_user_id: assignedByUserId,
           action_required: payload.actionRequired,
           due_date: payload.dueDate,
           status: "assigned"
@@ -137,7 +144,7 @@ export async function POST(request: Request) {
       report_id: report.id,
       old_status: report.status,
       new_status: "assigned",
-      changed_by_user_id: payload.assignedByUserId ?? null,
+      changed_by_user_id: assignedByUserId,
       comment: commentParts.join(" ")
     });
 

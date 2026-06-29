@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Filter, LockKeyhole, UserCheck } from "lucide-react";
 import { Card } from "@/components/Card";
 import { MetricCard } from "@/components/MetricCard";
+import { getActionOwnerIdForUser, requireAppRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { statusLabel } from "@/lib/status";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
@@ -104,8 +105,11 @@ async function getActions(ownerId?: string): Promise<{ actions: ActionItem[]; ow
 }
 
 export default async function ActionOwnerDashboardPage({ searchParams }: { searchParams?: Promise<{ ownerId?: string }> }) {
+  const profile = await requireAppRole(["admin", "ehs", "action_owner"], "/actions");
   const params = searchParams ? await searchParams : {};
-  const { actions, owners, selectedOwnerId, error } = await getActions(params.ownerId);
+  const forcedOwnerId = profile.appUser.role === "action_owner" ? await getActionOwnerIdForUser(profile.appUser.id) : null;
+  const canSelectOwner = profile.appUser.role !== "action_owner";
+  const { actions, owners, selectedOwnerId, error } = await getActions(forcedOwnerId ?? params.ownerId);
   const overdue = actions.filter((action) => new Date(action.due_date) < new Date() && !["closed", "cancelled"].includes(action.assignment_status)).length;
   const pendingVerification = actions.filter((action) => action.assignment_status === "pending_verification").length;
   const inProgress = actions.filter((action) => action.assignment_status === "in_progress").length;
@@ -117,9 +121,12 @@ export default async function ActionOwnerDashboardPage({ searchParams }: { searc
         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="text-3xl font-bold">My assigned safety actions</h1>
-            <p className="mt-2 max-w-3xl text-sm text-green-50">Privacy-safe action dashboard. Reporter name, phone number, employee ID, and company name are not loaded on this screen.</p>
+            <p className="mt-2 max-w-3xl text-sm text-green-50">Signed in as {profile.appUser.name}. Reporter name, phone number, employee ID, and company name are not loaded on this screen.</p>
           </div>
-          <Link href="/dashboard" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green">EHS Dashboard</Link>
+          <div className="flex flex-wrap gap-2">
+            {profile.appUser.role === "action_owner" ? null : <Link href="/dashboard" className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold">EHS Dashboard</Link>}
+            <Link href="/auth/logout" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green">Sign out</Link>
+          </div>
         </div>
       </header>
 
@@ -129,31 +136,45 @@ export default async function ActionOwnerDashboardPage({ searchParams }: { searc
         </div>
       ) : null}
 
+      {profile.appUser.role === "action_owner" && !forcedOwnerId ? (
+        <Card>
+          <h2 className="text-lg font-bold">No action owner profile linked</h2>
+          <p className="mt-2 text-sm text-slate-600">Your login exists, but no record was found in the action_owners table. Ask EHS/Admin to link your user record as an action owner.</p>
+        </Card>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="Assigned" value={actions.length} note="Visible for selected owner" />
+        <MetricCard label="Assigned" value={actions.length} note="Visible for current owner" />
         <MetricCard label="In progress" value={inProgress} note="Owner has started action" />
         <MetricCard label="Pending verification" value={pendingVerification} note="Waiting for EHS review" />
         <MetricCard label="Overdue" value={overdue} note="Due date passed" />
       </section>
 
-      <section className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
+      <section className={`mt-6 grid gap-6 ${canSelectOwner ? "lg:grid-cols-[0.9fr_1.4fr]" : "lg:grid-cols-[0.7fr_1.6fr]"}`}>
         <div className="space-y-4">
-          <Card>
-            <h2 className="flex items-center gap-2 text-lg font-bold"><Filter size={18} /> Select action owner</h2>
-            <p className="mt-2 text-sm text-slate-600">Temporary Phase 3B selector. Later this will be controlled by Supabase Auth login.</p>
-            <div className="mt-4 space-y-2">
-              {owners.length > 0 ? owners.map((owner) => (
-                <Link
-                  key={owner.id}
-                  href={`/actions?ownerId=${owner.id}`}
-                  className={`block rounded-2xl border p-3 text-sm transition ${selectedOwnerId === owner.id ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200 bg-white text-slate-700 hover:border-safety-green/40"}`}
-                >
-                  <span className="font-bold">{owner.name}</span>
-                  <span className="mt-1 block text-xs text-slate-500">{owner.departmentName ?? owner.ownerLevel} · {owner.email ?? "No email"}</span>
-                </Link>
-              )) : <p className="text-sm text-slate-600">No action owners found.</p>}
-            </div>
-          </Card>
+          {canSelectOwner ? (
+            <Card>
+              <h2 className="flex items-center gap-2 text-lg font-bold"><Filter size={18} /> Select action owner</h2>
+              <p className="mt-2 text-sm text-slate-600">EHS/Admin can review action owner queues. Action owners only see their own queue.</p>
+              <div className="mt-4 space-y-2">
+                {owners.length > 0 ? owners.map((owner) => (
+                  <Link
+                    key={owner.id}
+                    href={`/actions?ownerId=${owner.id}`}
+                    className={`block rounded-2xl border p-3 text-sm transition ${selectedOwnerId === owner.id ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200 bg-white text-slate-700 hover:border-safety-green/40"}`}
+                  >
+                    <span className="font-bold">{owner.name}</span>
+                    <span className="mt-1 block text-xs text-slate-500">{owner.departmentName ?? owner.ownerLevel} · {owner.email ?? "No email"}</span>
+                  </Link>
+                )) : <p className="text-sm text-slate-600">No action owners found.</p>}
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <h2 className="flex items-center gap-2 text-lg font-bold"><UserCheck size={18} /> Your queue</h2>
+              <p className="mt-2 text-sm text-slate-600">Role-based access is active. You are only viewing actions assigned to your linked action owner profile.</p>
+            </Card>
+          )}
 
           <Card>
             <h2 className="flex items-center gap-2 text-lg font-bold"><LockKeyhole size={18} /> Privacy check</h2>
