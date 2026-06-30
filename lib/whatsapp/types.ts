@@ -13,7 +13,27 @@ export type WhatsAppSessionState =
   | "await_location"
   | "await_urgency"
   | "await_ai_confirmation"
-  | "await_status_report";
+  | "await_status_report"
+  | "ai_chat";
+
+export type AiConversationPhase = "setup" | "reporting" | "confirm";
+
+export interface AiConversationSlots {
+  name?: string;
+  category?: ReporterCategory;
+  employeeId?: string | null;
+  companyName?: string | null;
+  consent?: boolean;
+  description?: string;
+  locationText?: string;
+  urgency?: UrgencyLevel;
+}
+
+export interface AiConversationContext {
+  transcript: Array<{ role: "user" | "bot"; text: string }>;
+  slots: AiConversationSlots;
+  phase: AiConversationPhase;
+}
 
 export type WhatsAppInboundType = "text" | "image" | "interactive" | "unsupported";
 
@@ -62,6 +82,7 @@ export interface WhatsAppSessionContext {
   employeeId?: string | null;
   companyName?: string | null;
   draft?: WhatsAppReportDraft;
+  aiChat?: AiConversationContext;
 }
 
 export interface WhatsAppSessionRow {

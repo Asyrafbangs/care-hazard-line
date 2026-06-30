@@ -3,6 +3,8 @@ import { generateHazardSummary } from "@/lib/ai";
 import { generateReportNo } from "@/lib/report-number";
 import type { LanguageCode, UrgencyLevel } from "@/types/domain";
 import type {
+  AiConversationContext,
+  AiConversationSlots,
   WhatsAppEngineResult,
   WhatsAppInboundMessage,
   WhatsAppReportDraft,
@@ -11,6 +13,8 @@ import type {
   WhatsAppSessionState,
   WhatsAppStoredPhoto
 } from "@/lib/whatsapp/types";
+import { isGeminiConfigured } from "@/lib/gemini";
+import { runAiConversationTurn } from "@/lib/whatsapp/ai-agent";
 import {
   aiReviewMessage,
   cleanText,
@@ -52,6 +56,25 @@ function defaultContext(profileName?: string): WhatsAppSessionContext {
   return profileName ? { name: profileName } : {};
 }
 
+function prefillSlots(reporter: ReporterRow | null): AiConversationSlots {
+  if (!reporter) return {};
+  return {
+    name: reporter.name,
+    category: reporter.category,
+    employeeId: reporter.employee_id,
+    companyName: reporter.company_name,
+    consent: true
+  };
+}
+
+function newAiContext(reporter: ReporterRow | null): AiConversationContext {
+  return {
+    transcript: [],
+    slots: prefillSlots(reporter),
+    phase: reporter ? "reporting" : "setup"
+  };
+}
+
 function withReply(reply: string, state: WhatsAppSessionState, extra?: Partial<WhatsAppEngineResult>): WhatsAppEngineResult {
   return { ok: true, reply, state, shouldSend: true, ...extra };
 }
@@ -88,9 +111,10 @@ async function getOrCreateSession(input: {
     return { session, reporter };
   }
 
-  const initialState: WhatsAppSessionState = reporter ? "main_menu" : "await_language";
+  const aiMode = isGeminiConfigured();
+  const initialState: WhatsAppSessionState = aiMode ? "ai_chat" : reporter ? "main_menu" : "await_language";
   const selectedLanguage = reporter?.preferred_language ?? "en";
-  const context = reporter
+  const context: WhatsAppSessionContext = reporter
     ? {
         name: reporter.name,
         category: reporter.category,
@@ -98,6 +122,10 @@ async function getOrCreateSession(input: {
         companyName: reporter.company_name
       }
     : defaultContext(input.profileName);
+
+  if (aiMode) {
+    context.aiChat = newAiContext(reporter);
+  }
 
   const { data: created, error: createError } = await input.supabase
     .from("whatsapp_sessions")
@@ -531,6 +559,137 @@ async function handleReportFlow(input: {
   return null;
 }
 
+async function handleAiConversation(input: {
+  supabase: Supabase;
+  session: WhatsAppSessionRow;
+  reporter: ReporterRow | null;
+  inbound: WhatsAppInboundMessage;
+}): Promise<WhatsAppEngineResult> {
+  const text = cleanText(input.inbound.text ?? input.inbound.caption);
+  const context: WhatsAppSessionContext = input.session.context ?? {};
+  input.session.context = context;
+  const draft: WhatsAppReportDraft = context.draft ?? {};
+  context.draft = draft;
+
+  // STATUS works at any point for a known reporter.
+  if (/^status$/i.test(text)) {
+    const rep = input.reporter ?? (input.session.reporter_id ? await getReporter(input.supabase, input.inbound.phoneNumber) : null);
+    if (rep) {
+      const statusText = await getRecentStatus(input.supabase, rep);
+      await setState(input.supabase, input.session, "ai_chat", context);
+      return withReply(`${statusText}\n\nType STATUS anytime, or just tell me about a new hazard.`, "ai_chat");
+    }
+  }
+
+  // Capture an inbound photo ourselves; the binary never goes to the model.
+  let photoJustReceived = false;
+  if (input.inbound.type === "image" && input.inbound.mediaId) {
+    try {
+      draft.photo = await storeWhatsAppImage({
+        phoneNumber: input.inbound.phoneNumber,
+        mediaId: input.inbound.mediaId,
+        mimeType: input.inbound.mediaMimeType,
+        source: input.inbound.source
+      });
+      photoJustReceived = true;
+    } catch (error) {
+      await setState(input.supabase, input.session, "ai_chat", context);
+      return withReply(
+        `I couldn't save that photo (${error instanceof Error ? error.message : "unknown error"}). Could you try sending it again?`,
+        "ai_chat"
+      );
+    }
+  }
+
+  const aiContext: AiConversationContext = context.aiChat ?? newAiContext(input.reporter);
+  const isNewReporter = !input.reporter && !input.session.reporter_id;
+  const hasPhoto = Boolean(draft.photo);
+
+  const turn = await runAiConversationTurn({
+    userText: text,
+    hasPhoto,
+    photoJustReceived,
+    isNewReporter,
+    reporterName: input.reporter?.name ?? context.name ?? null,
+    aiContext
+  });
+
+  if (!turn) {
+    // Gemini unavailable this turn — keep all collected data, ask to retry.
+    context.aiChat = aiContext;
+    await setState(input.supabase, input.session, "ai_chat", context);
+    return withReply("Sorry, I had a brief problem just now. Could you say that again?", "ai_chat");
+  }
+
+  const { result } = turn;
+  context.aiChat = turn.aiContext;
+
+  const language: LanguageCode = result.detectedLanguage ?? input.session.selected_language;
+  input.session.selected_language = language;
+
+  // Create the reporter profile once setup is complete.
+  let activeReporter = input.reporter;
+  if (!activeReporter && input.session.reporter_id) {
+    activeReporter = await getReporter(input.supabase, input.inbound.phoneNumber);
+  }
+  if (!activeReporter && !input.session.reporter_id) {
+    const slots = result.slots;
+    if (slots.name && slots.category && slots.consent === true) {
+      context.name = slots.name;
+      context.category = slots.category;
+      context.employeeId = slots.employeeId ?? null;
+      context.companyName = slots.companyName ?? null;
+      activeReporter = await upsertReporterFromSession(input.supabase, input.session, input.inbound.phoneNumber);
+    }
+  }
+
+  // Submit when the model confirms and every required piece is present.
+  let reportNo: string | undefined;
+  let finalReply = result.reply;
+  const canSubmit =
+    result.readyToSubmit &&
+    activeReporter &&
+    draft.photo &&
+    result.slots.description &&
+    result.slots.locationText &&
+    result.hazardAnalysis;
+
+  if (canSubmit && activeReporter) {
+    draft.description = result.slots.description;
+    draft.locationText = result.slots.locationText;
+    draft.workerUrgency = result.slots.urgency;
+    draft.aiSummary = {
+      hazardSummary: result.hazardAnalysis!.hazardSummary,
+      suggestedCategory: result.hazardAnalysis!.suggestedCategory,
+      urgencyLevel: result.slots.urgency === "urgent" ? "urgent" : result.hazardAnalysis!.urgencyLevel,
+      recommendedImmediateAction: result.hazardAnalysis!.recommendedImmediateAction,
+      suggestedOwnerDepartment: result.hazardAnalysis!.suggestedOwnerDepartment,
+      aiStatus: "completed"
+    };
+    context.draft = draft;
+
+    const submitResult = await createReportFromDraft({
+      supabase: input.supabase,
+      reporter: activeReporter,
+      session: input.session
+    });
+    reportNo = submitResult.reportNo;
+
+    // Reset for the next report but stay in the conversational flow.
+    context.draft = {};
+    context.aiChat = newAiContext(activeReporter);
+    finalReply = [
+      result.reply,
+      "",
+      `Report ID: ${reportNo} — saved and sent to EHS for review.${submitResult.urgency === "urgent" ? " Marked URGENT." : ""}`,
+      "Type STATUS anytime to check progress."
+    ].join("\n");
+  }
+
+  await setState(input.supabase, input.session, "ai_chat", context, language);
+  return withReply(finalReply, "ai_chat", reportNo ? { reportNo } : undefined);
+}
+
 export async function processWhatsAppInbound(inbound: WhatsAppInboundMessage): Promise<WhatsAppEngineResult> {
   const supabase = createSupabaseAdmin();
   const phoneNumber = normalizeWhatsAppPhone(inbound.phoneNumber);
@@ -546,9 +705,37 @@ export async function processWhatsAppInbound(inbound: WhatsAppInboundMessage): P
 
   await supabase.from("reporters").update({ last_seen_at: new Date().toISOString() }).eq("phone_number", phoneNumber);
 
+  const aiMode = isGeminiConfigured();
+
   if (/^reset$/i.test(text)) {
+    if (aiMode) {
+      const greeting = reporter
+        ? `Hi ${reporter.name}! 👋 I'm here for the CARE Hazard Line. Is there a hazard you'd like to report?`
+        : "Hi! 👋 I'm the CARE Hazard Line assistant. I can help you report a workplace hazard. To get started, what's your name?";
+      const aiContext = newAiContext(reporter);
+      aiContext.transcript.push({ role: "bot", text: greeting });
+      const resetContext: WhatsAppSessionContext = reporter
+        ? {
+            name: reporter.name,
+            category: reporter.category,
+            employeeId: reporter.employee_id,
+            companyName: reporter.company_name,
+            draft: {},
+            aiChat: aiContext
+          }
+        : { ...defaultContext(normalizedInbound.profileName), draft: {}, aiChat: aiContext };
+      await setState(supabase, session, "ai_chat", resetContext);
+      return withReply(greeting, "ai_chat");
+    }
+
     await setState(supabase, session, "await_language", defaultContext(normalizedInbound.profileName), "en");
     return withReply(`Profile reset for testing.\n${languageMenu()}`, "await_language");
+  }
+
+  // AI conversation mode: drive setup + reporting through Gemini. Existing
+  // in-progress legacy flows keep their state until finished or RESET.
+  if (aiMode && (session.state === "ai_chat" || session.state === "main_menu")) {
+    return handleAiConversation({ supabase, session, reporter, inbound: normalizedInbound });
   }
 
   if (/^menu$/i.test(text)) {
