@@ -49,6 +49,9 @@ export default function HomePage() {
               <ShieldCheck size={18} /> EHS Verification Queue
             </Button>
           </Link>
+          <Link href="/privacy" className="text-center text-xs font-semibold text-slate-500 underline">
+            Privacy Policy
+          </Link>
         </div>
 
         <Card>
