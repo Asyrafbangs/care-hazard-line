@@ -90,52 +90,65 @@ function toInboundMessages(payload: WhatsAppWebhookPayload): WhatsAppInboundMess
 }
 
 export async function POST(request: Request) {
-  const payload = (await request.json().catch(() => null)) as WhatsAppWebhookPayload | null;
+  try {
+    const payload = (await request.json().catch(() => null)) as WhatsAppWebhookPayload | null;
 
-  if (!payload) {
-    return NextResponse.json({ ok: false, error: "Invalid WhatsApp webhook payload." }, { status: 400 });
-  }
+    if (!payload) {
+      return NextResponse.json({ ok: false, error: "Invalid WhatsApp webhook payload." }, { status: 400 });
+    }
 
-  const messages = toInboundMessages(payload);
+    const messages = toInboundMessages(payload);
 
-  if (messages.length === 0) {
-    return NextResponse.json({ ok: true, received: true, messageCount: 0, note: "No inbound user messages. Status events ignored." });
-  }
+    if (messages.length === 0) {
+      return NextResponse.json({ ok: true, received: true, messageCount: 0, note: "No inbound user messages. Status events ignored." });
+    }
 
-  const results = [];
+    const results = [];
 
-  for (const inbound of messages) {
-    await logWhatsAppMessage({
-      phoneNumber: inbound.phoneNumber,
-      direction: "inbound",
-      messageType: inbound.type,
-      messageText: inbound.text ?? inbound.caption ?? null,
-      payload: inbound.rawPayload,
-      status: "received"
+    for (const inbound of messages) {
+      await logWhatsAppMessage({
+        phoneNumber: inbound.phoneNumber,
+        direction: "inbound",
+        messageType: inbound.type,
+        messageText: inbound.text ?? inbound.caption ?? null,
+        payload: inbound.rawPayload,
+        status: "received"
+      });
+
+      const result = await processWhatsAppInbound(inbound);
+      const sendResult = result.shouldSend === false
+        ? { ok: false, skipped: true, error: "Reply sending disabled by engine." }
+        : await sendWhatsAppText({ to: inbound.phoneNumber, body: result.reply });
+
+      await logWhatsAppMessage({
+        phoneNumber: inbound.phoneNumber,
+        direction: "outbound",
+        messageType: "text",
+        messageText: result.reply,
+        payload: sendResult,
+        status: sendResult.ok ? "sent" : sendResult.skipped ? "skipped" : "failed"
+      });
+
+      results.push({
+        phoneNumber: inbound.phoneNumber,
+        state: result.state,
+        reportNo: result.reportNo ?? null,
+        sent: sendResult.ok,
+        skipped: Boolean(sendResult.skipped)
+      });
+    }
+
+    return NextResponse.json({ ok: true, received: true, messageCount: messages.length, results });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown WhatsApp webhook error";
+    console.error("[whatsapp:webhook] processing failed", {
+      error: message,
+      stack: error instanceof Error ? error.stack : undefined
     });
 
-    const result = await processWhatsAppInbound(inbound);
-    const sendResult = result.shouldSend === false
-      ? { ok: false, skipped: true, error: "Reply sending disabled by engine." }
-      : await sendWhatsAppText({ to: inbound.phoneNumber, body: result.reply });
-
-    await logWhatsAppMessage({
-      phoneNumber: inbound.phoneNumber,
-      direction: "outbound",
-      messageType: "text",
-      messageText: result.reply,
-      payload: sendResult,
-      status: sendResult.ok ? "sent" : sendResult.skipped ? "skipped" : "failed"
-    });
-
-    results.push({
-      phoneNumber: inbound.phoneNumber,
-      state: result.state,
-      reportNo: result.reportNo ?? null,
-      sent: sendResult.ok,
-      skipped: Boolean(sendResult.skipped)
-    });
+    return NextResponse.json(
+      { ok: false, received: false, error: "WhatsApp webhook processing failed.", details: message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ ok: true, received: true, messageCount: messages.length, results });
 }

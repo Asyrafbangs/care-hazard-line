@@ -174,7 +174,7 @@ export async function logWhatsAppMessage(input: {
 }) {
   const supabase = createSupabaseAdmin();
 
-  await supabase.from("whatsapp_message_logs").insert({
+  const { error } = await supabase.from("whatsapp_message_logs").insert({
     phone_number: input.phoneNumber,
     direction: input.direction,
     message_type: input.messageType,
@@ -182,4 +182,8 @@ export async function logWhatsAppMessage(input: {
     payload: input.payload ?? null,
     status: input.status ?? (input.direction === "inbound" ? "received" : "sent")
   });
+
+  if (error) {
+    throw new Error(`Could not log WhatsApp message: ${error.message}`);
+  }
 }
