@@ -12,21 +12,31 @@ function extensionFromMime(mimeType?: string | null) {
   return "jpg";
 }
 
+export interface StoredWhatsAppImage {
+  photo: WhatsAppStoredPhoto;
+  // Base64-encoded image bytes for downstream vision analysis. Null for the
+  // simulator (no real image) — never persisted to the session/draft.
+  dataBase64: string | null;
+}
+
 export async function storeWhatsAppImage(input: {
   phoneNumber: string;
   mediaId: string;
   mimeType?: string | null;
   source?: "webhook" | "simulator";
-}): Promise<WhatsAppStoredPhoto> {
+}): Promise<StoredWhatsAppImage> {
   if (input.source === "simulator" || input.mediaId.startsWith("simulated")) {
     return {
-      provider: "legacy",
-      bucket: null,
-      path: null,
-      originalFileName: "whatsapp-simulator-photo.jpg",
-      mimeType: input.mimeType ?? "image/jpeg",
-      sizeBytes: 0,
-      mediaId: input.mediaId
+      photo: {
+        provider: "legacy",
+        bucket: null,
+        path: null,
+        originalFileName: "whatsapp-simulator-photo.jpg",
+        mimeType: input.mimeType ?? "image/jpeg",
+        sizeBytes: 0,
+        mediaId: input.mediaId
+      },
+      dataBase64: null
     };
   }
 
@@ -78,12 +88,15 @@ export async function storeWhatsAppImage(input: {
   }
 
   return {
-    provider: "supabase",
-    bucket,
-    path: storagePath,
-    originalFileName: fileName,
-    mimeType,
-    sizeBytes: buffer.byteLength,
-    mediaId: input.mediaId
+    photo: {
+      provider: "supabase",
+      bucket,
+      path: storagePath,
+      originalFileName: fileName,
+      mimeType,
+      sizeBytes: buffer.byteLength,
+      mediaId: input.mediaId
+    },
+    dataBase64: buffer.toString("base64")
   };
 }

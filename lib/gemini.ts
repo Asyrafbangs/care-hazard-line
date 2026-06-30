@@ -65,3 +65,47 @@ export async function generateStructured<T>(input: {
     return null;
   }
 }
+
+/**
+ * Vision variant: sends an inline image plus text and forces a JSON response
+ * matching `responseSchema`. Returns the parsed object, or null on any failure.
+ */
+export async function generateStructuredVision<T>(input: {
+  systemInstruction: string;
+  userText: string;
+  imageBase64: string;
+  mimeType: string;
+  responseSchema: Record<string, unknown>;
+  temperature?: number;
+}): Promise<T | null> {
+  try {
+    const ai = getClient();
+    const response = await ai.models.generateContent({
+      model: getGeminiModel(),
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: input.mimeType, data: input.imageBase64 } },
+            { text: input.userText }
+          ]
+        }
+      ],
+      config: {
+        systemInstruction: input.systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: input.responseSchema as never,
+        temperature: input.temperature ?? 0.4
+      }
+    });
+
+    const text = response.text;
+    if (!text) return null;
+    return JSON.parse(text) as T;
+  } catch (error) {
+    console.error("[gemini] generateStructuredVision failed", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return null;
+  }
+}

@@ -10,24 +10,29 @@ const simulateSchema = z.object({
   phoneNumber: z.string().trim().min(6),
   profileName: z.string().trim().optional().nullable(),
   text: z.string().trim().optional().nullable(),
-  image: z.boolean().optional().default(false)
+  image: z.boolean().optional().default(false),
+  // Optional real image (base64, no data: prefix) to exercise vision analysis.
+  imageBase64: z.string().optional().nullable(),
+  imageMimeType: z.string().optional().nullable()
 });
 
 export async function POST(request: Request) {
   try {
     const payload = simulateSchema.parse(await request.json());
     const phoneNumber = normalizeWhatsAppPhone(payload.phoneNumber);
+    const hasImage = payload.image || Boolean(payload.imageBase64);
     const inbound = {
       phoneNumber,
       whatsappId: `wa_${phoneNumber}`,
       profileName: payload.profileName ?? "Test Reporter",
       messageId: `sim_${Date.now()}`,
-      type: payload.image ? "image" as const : "text" as const,
+      type: hasImage ? "image" as const : "text" as const,
       text: payload.text ?? "",
-      mediaId: payload.image ? `simulated_media_${Date.now()}` : undefined,
-      mediaMimeType: payload.image ? "image/jpeg" : undefined,
-      caption: payload.image ? payload.text ?? "" : undefined,
-      rawPayload: payload,
+      mediaId: hasImage ? `simulated_media_${Date.now()}` : undefined,
+      mediaMimeType: hasImage ? payload.imageMimeType ?? "image/jpeg" : undefined,
+      caption: hasImage ? payload.text ?? "" : undefined,
+      imageBase64: payload.imageBase64 ?? undefined,
+      rawPayload: { ...payload, imageBase64: payload.imageBase64 ? "[base64]" : undefined },
       source: "simulator" as const
     };
 

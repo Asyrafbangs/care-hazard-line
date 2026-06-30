@@ -15,6 +15,7 @@ import type {
 } from "@/lib/whatsapp/types";
 import { isGeminiConfigured } from "@/lib/gemini";
 import { runAiConversationTurn } from "@/lib/whatsapp/ai-agent";
+import { analyzeHazardPhoto, type PhotoHazardAnalysis } from "@/lib/whatsapp/vision";
 import {
   aiReviewMessage,
   cleanText,
@@ -73,6 +74,26 @@ function newAiContext(reporter: ReporterRow | null): AiConversationContext {
     slots: prefillSlots(reporter),
     phase: reporter ? "reporting" : "setup"
   };
+}
+
+// Turns the vision assessment into a note for the conversation agent. The wording
+// always reinforces that the AI is a support tool and never blocks submission.
+function buildPhotoNote(analysis?: PhotoHazardAnalysis): string {
+  const guardrail =
+    "This is an AI support tool only — never refuse or block submission. The reporter may always submit for human EHS review, even with 0 hazards or if they disagree. The final decision rests with the EHS/safety team.";
+
+  if (!analysis || analysis.aiStatus === "failed") {
+    return `The reporter just sent a photo (saved). Automatic photo analysis was unavailable. ${guardrail}`;
+  }
+
+  if (analysis.hazardCount === 0) {
+    return `The reporter just sent a photo (saved). Photo analysis found no obvious hazard: "${analysis.summary}". Gently share this, but make clear they can still submit the report for human review if they believe it is valid. ${guardrail}`;
+  }
+
+  const list = analysis.hazards
+    .map((h, i) => `${i + 1}. ${h.title} [${h.severity}] — ${h.description} (action: ${h.recommendedAction})`)
+    .join("\n");
+  return `The reporter just sent a photo (saved). Photo analysis identified ${analysis.hazardCount} potential hazard(s):\n${list}\nShare these naturally as helpful observations, then continue toward submitting. ${guardrail}`;
 }
 
 function withReply(reply: string, state: WhatsAppSessionState, extra?: Partial<WhatsAppEngineResult>): WhatsAppEngineResult {
@@ -256,6 +277,8 @@ async function createReportFromDraft(input: {
       ai_recommended_immediate_action: draft.aiSummary.recommendedImmediateAction,
       ai_suggested_owner_department: draft.aiSummary.suggestedOwnerDepartment,
       ai_status: draft.aiSummary.aiStatus,
+      ai_photo_analysis: draft.photoAnalysis ?? null,
+      ai_photo_hazard_count: draft.photoAnalysis?.hazardCount ?? null,
       reporter_confirmed_ai_summary: true,
       final_category_id: selectedCategory?.id ?? null,
       final_urgency: urgency,
@@ -476,12 +499,13 @@ async function handleReportFlow(input: {
     }
 
     try {
-      draft.photo = await storeWhatsAppImage({
+      const stored = await storeWhatsAppImage({
         phoneNumber: input.inbound.phoneNumber,
         mediaId: input.inbound.mediaId,
         mimeType: input.inbound.mediaMimeType,
         source: input.inbound.source
       });
+      draft.photo = stored.photo;
       context.draft = draft;
       await setState(input.supabase, input.session, "await_location", context);
       return withReply(promptForLocation(), "await_location");
@@ -581,17 +605,32 @@ async function handleAiConversation(input: {
     }
   }
 
-  // Capture an inbound photo ourselves; the binary never goes to the model.
-  let photoJustReceived = false;
+  const aiContext: AiConversationContext = context.aiChat ?? newAiContext(input.reporter);
+
+  // Capture an inbound photo, then run Gemini vision on the actual image so the
+  // assessment is grounded in what the photo shows + the description so far.
+  let inboundNote: string | undefined;
   if (input.inbound.type === "image" && input.inbound.mediaId) {
     try {
-      draft.photo = await storeWhatsAppImage({
+      const stored = await storeWhatsAppImage({
         phoneNumber: input.inbound.phoneNumber,
         mediaId: input.inbound.mediaId,
         mimeType: input.inbound.mediaMimeType,
         source: input.inbound.source
       });
-      photoJustReceived = true;
+      draft.photo = stored.photo;
+
+      // Real WhatsApp media yields bytes from storage; the simulator can inject
+      // a test image so the vision path is exercisable end-to-end.
+      const analysisBytes = stored.dataBase64 ?? input.inbound.imageBase64 ?? null;
+      if (analysisBytes) {
+        draft.photoAnalysis = await analyzeHazardPhoto({
+          description: aiContext.slots.description ?? text,
+          imageBase64: analysisBytes,
+          mimeType: stored.photo.mimeType ?? input.inbound.mediaMimeType ?? "image/jpeg"
+        });
+      }
+      inboundNote = buildPhotoNote(draft.photoAnalysis);
     } catch (error) {
       await setState(input.supabase, input.session, "ai_chat", context);
       return withReply(
@@ -601,14 +640,13 @@ async function handleAiConversation(input: {
     }
   }
 
-  const aiContext: AiConversationContext = context.aiChat ?? newAiContext(input.reporter);
   const isNewReporter = !input.reporter && !input.session.reporter_id;
   const hasPhoto = Boolean(draft.photo);
 
   const turn = await runAiConversationTurn({
     userText: text,
     hasPhoto,
-    photoJustReceived,
+    inboundNote,
     isNewReporter,
     reporterName: input.reporter?.name ?? context.name ?? null,
     aiContext
@@ -713,7 +751,6 @@ export async function processWhatsAppInbound(inbound: WhatsAppInboundMessage): P
         ? `Hi ${reporter.name}! 👋 I'm here for the CARE Hazard Line. Is there a hazard you'd like to report?`
         : "Hi! 👋 I'm the CARE Hazard Line assistant. I can help you report a workplace hazard. To get started, what's your name?";
       const aiContext = newAiContext(reporter);
-      aiContext.transcript.push({ role: "bot", text: greeting });
       const resetContext: WhatsAppSessionContext = reporter
         ? {
             name: reporter.name,

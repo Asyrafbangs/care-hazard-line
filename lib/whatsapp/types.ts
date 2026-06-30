@@ -1,4 +1,5 @@
 import type { LanguageCode, ReporterCategory, UrgencyLevel } from "@/types/domain";
+import type { PhotoHazardAnalysis } from "@/lib/whatsapp/vision";
 
 export type WhatsAppSessionState =
   | "await_language"
@@ -47,6 +48,8 @@ export interface WhatsAppInboundMessage {
   mediaId?: string;
   mediaMimeType?: string;
   caption?: string;
+  // Simulator-only: a real base64 image so the vision path can be tested.
+  imageBase64?: string;
   rawPayload?: unknown;
   source?: "webhook" | "simulator";
 }
@@ -64,6 +67,7 @@ export interface WhatsAppStoredPhoto {
 export interface WhatsAppReportDraft {
   description?: string;
   photo?: WhatsAppStoredPhoto;
+  photoAnalysis?: PhotoHazardAnalysis;
   locationText?: string;
   workerUrgency?: UrgencyLevel;
   aiSummary?: {
