@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getOptionalEnv } from "@/lib/env";
 import { getWhatsAppApiVersion, getWhatsAppPhoneNumberInfo, isWhatsAppConfigured } from "@/lib/whatsapp/send";
 
 export const runtime = "nodejs";
@@ -39,9 +40,14 @@ export async function GET(request: Request) {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
   };
+  const rawSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const sanitizedSupabaseUrl = getOptionalEnv("NEXT_PUBLIC_SUPABASE_URL");
   const supabase = {
-    urlConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    urlValid: isValidHttpUrl(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    urlConfigured: Boolean(rawSupabaseUrl),
+    urlValid: isValidHttpUrl(sanitizedSupabaseUrl),
+    // True when the dashboard value carried stray whitespace/quotes/newline.
+    // This is the classic cause of "Invalid supabaseUrl" in production.
+    urlHadStrayCharacters: Boolean(rawSupabaseUrl) && rawSupabaseUrl !== sanitizedSupabaseUrl,
     anonKeyConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     serviceRoleConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
   };
