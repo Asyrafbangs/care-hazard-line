@@ -2,8 +2,12 @@ import { MessageCircle } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { Card } from "@/components/Card";
 import { WhatsAppProductionPanel } from "@/components/WhatsAppProductionPanel";
+import { requireAppRole } from "@/lib/auth";
 
-export default function WhatsAppProductionPage() {
+export const dynamic = "force-dynamic";
+
+export default async function WhatsAppProductionPage() {
+  await requireAppRole(["admin", "ehs"], "/dev/whatsapp-setup");
   return (
     <MobileShell title="WhatsApp production" subtitle="Connect Meta Cloud API to CARE Hazard Line.">
       <div className="space-y-4">

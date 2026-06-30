@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase-client";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = useMemo(() => searchParams.get("next") || "/dashboard", [searchParams]);
+  const nextPath = useMemo(() => searchParams.get("next") || "/login", [searchParams]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,7 +37,7 @@ export function LoginForm() {
 
       setMessage({ type: "success", text: "Signed in. Opening your console..." });
       router.refresh();
-      router.replace(nextPath.startsWith("/") ? nextPath : "/dashboard");
+      router.replace(nextPath.startsWith("/") ? nextPath : "/login");
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Login failed." });
     } finally {

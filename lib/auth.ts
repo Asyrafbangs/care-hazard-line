@@ -69,7 +69,7 @@ export async function requireAppRole(allowedRoles: AppRole[], nextPath: string):
   const profile = await getCurrentAppUser();
 
   if (!profile) {
-    redirect(`/auth/login?next=${encodeURIComponent(nextPath)}`);
+    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
 
   if (!allowedRoles.includes(profile.appUser.role)) {

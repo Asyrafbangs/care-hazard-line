@@ -99,14 +99,14 @@ async function getActionDetail(assignmentId: string): Promise<{ action: ActionDe
 
 export default async function ActionDetailPage({ params }: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = await params;
-  const profile = await requireAppRole(["admin", "ehs", "action_owner"], `/actions/${assignmentId}`);
+  const profile = await requireAppRole(["admin", "ehs", "action_owner"], `/owner/actions/${assignmentId}`);
   const currentOwnerId = profile.appUser.role === "action_owner" ? await getActionOwnerIdForUser(profile.appUser.id) : null;
   const { action, photos, updates, error } = await getActionDetail(assignmentId);
 
   if (!action) {
     return (
       <main className="mx-auto min-h-screen max-w-5xl px-4 py-6">
-        <Link href="/actions" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to actions</Link>
+        <Link href="/owner/actions" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to actions</Link>
         <Card>
           <h1 className="text-2xl font-bold">Action not found</h1>
           <p className="mt-2 text-sm text-slate-600">{error ?? "The action could not be loaded."}</p>
@@ -118,7 +118,7 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
   if (profile.appUser.role === "action_owner" && action.action_owner_id !== currentOwnerId) {
     return (
       <main className="mx-auto min-h-screen max-w-5xl px-4 py-6">
-        <Link href="/actions" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to actions</Link>
+        <Link href="/owner/actions" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to actions</Link>
         <Card>
           <h1 className="text-2xl font-bold">Action not visible</h1>
           <p className="mt-2 text-sm text-slate-600">This action is not assigned to your action owner profile. Reporter privacy and assignment visibility are enforced.</p>

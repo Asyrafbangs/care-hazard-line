@@ -2,8 +2,12 @@ import { MessageCircle } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { Card } from "@/components/Card";
 import { WhatsAppSimulator } from "@/components/WhatsAppSimulator";
+import { requireAppRole } from "@/lib/auth";
 
-export default function WhatsAppSimulatorPage() {
+export const dynamic = "force-dynamic";
+
+export default async function WhatsAppSimulatorPage() {
+  await requireAppRole(["admin", "ehs"], "/dev/whatsapp-simulator");
   return (
     <MobileShell title="WhatsApp simulator" subtitle="Test the Phase 5 conversation engine without Meta setup.">
       <div className="space-y-4">

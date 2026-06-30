@@ -105,7 +105,7 @@ async function getActions(ownerId?: string): Promise<{ actions: ActionItem[]; ow
 }
 
 export default async function ActionOwnerDashboardPage({ searchParams }: { searchParams?: Promise<{ ownerId?: string }> }) {
-  const profile = await requireAppRole(["admin", "ehs", "action_owner"], "/actions");
+  const profile = await requireAppRole(["admin", "ehs", "action_owner"], "/owner/actions");
   const params = searchParams ? await searchParams : {};
   const forcedOwnerId = profile.appUser.role === "action_owner" ? await getActionOwnerIdForUser(profile.appUser.id) : null;
   const canSelectOwner = profile.appUser.role !== "action_owner";
@@ -124,7 +124,7 @@ export default async function ActionOwnerDashboardPage({ searchParams }: { searc
             <p className="mt-2 max-w-3xl text-sm text-green-50">Signed in as {profile.appUser.name}. Reporter name, phone number, employee ID, and company name are not loaded on this screen.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {profile.appUser.role === "action_owner" ? null : <Link href="/dashboard" className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold">EHS Dashboard</Link>}
+            {profile.appUser.role === "action_owner" ? null : <Link href="/ehs/dashboard" className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold">EHS Dashboard</Link>}
             <Link href="/auth/logout" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green">Sign out</Link>
           </div>
         </div>
@@ -160,7 +160,7 @@ export default async function ActionOwnerDashboardPage({ searchParams }: { searc
                 {owners.length > 0 ? owners.map((owner) => (
                   <Link
                     key={owner.id}
-                    href={`/actions?ownerId=${owner.id}`}
+                    href={`/owner/actions?ownerId=${owner.id}`}
                     className={`block rounded-2xl border p-3 text-sm transition ${selectedOwnerId === owner.id ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200 bg-white text-slate-700 hover:border-safety-green/40"}`}
                   >
                     <span className="font-bold">{owner.name}</span>
@@ -207,7 +207,7 @@ function ActionCard({ action }: { action: ActionItem }) {
   const isOverdue = new Date(action.due_date) < new Date() && !["closed", "cancelled"].includes(action.assignment_status);
 
   return (
-    <Link href={`/actions/${action.assignment_id}`}>
+    <Link href={`/owner/actions/${action.assignment_id}`}>
       <Card className="transition hover:-translate-y-0.5 hover:shadow-lg">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>

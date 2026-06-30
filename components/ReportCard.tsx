@@ -25,7 +25,7 @@ export function ReportCard({
   status: ReportStatus;
 }) {
   return (
-    <Link href={`/dashboard/reports/${encodeURIComponent(reportNo)}`} className="block rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:ring-safety-green/30">
+    <Link href={`/ehs/reports/${encodeURIComponent(reportNo)}`} className="block rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:ring-safety-green/30">
       <article>
         <div className="flex items-start justify-between gap-3">
           <div>

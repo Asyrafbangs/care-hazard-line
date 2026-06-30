@@ -211,14 +211,14 @@ async function getReport(reportNo: string): Promise<{
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ reportNo: string }> }) {
   const { reportNo } = await params;
-  await requireAppRole(["admin", "ehs", "hod"], `/dashboard/reports/${encodeURIComponent(reportNo)}`);
+  await requireAppRole(["admin", "ehs", "hod"], `/ehs/reports/${encodeURIComponent(reportNo)}`);
   const decodedReportNo = decodeURIComponent(reportNo);
   const { report, photos, actionOwners, categories, assignment, actionUpdates, error } = await getReport(decodedReportNo);
 
   if (!report) {
     return (
       <main className="mx-auto min-h-screen max-w-5xl px-4 py-6">
-        <Link href="/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to dashboard</Link>
+        <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to dashboard</Link>
         <Card>
           <h1 className="text-2xl font-bold">Report not found</h1>
           <p className="mt-2 text-sm text-slate-600">{error ?? "The report could not be loaded."}</p>
@@ -234,7 +234,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
-      <Link href="/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to dashboard</Link>
+      <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to dashboard</Link>
 
       <header className="mb-6 rounded-3xl bg-safety-green p-6 text-white shadow-card">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-green-100">EHS secure report detail</p>

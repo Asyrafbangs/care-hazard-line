@@ -54,7 +54,7 @@ async function getReports(): Promise<{ reports: DashboardReport[]; source: "supa
 }
 
 export default async function DashboardPage() {
-  const profile = await requireAppRole(["admin", "ehs", "hod"], "/dashboard");
+  const profile = await requireAppRole(["admin", "ehs", "hod"], "/ehs/dashboard");
   const { reports, source, error } = await getReports();
   const urgent = reports.filter((report) => report.urgency === "urgent" || report.urgency === "high").length;
   const newReports = reports.filter((report) => report.status === "submitted" || report.status === "ehs_review").length;
@@ -72,8 +72,9 @@ export default async function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <span className="hidden rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold md:inline">{profile.appUser.name}</span>
-          <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/dashboard/verification"><ShieldCheck className="mr-2 inline" size={16} />Verification</Link>
+          <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/ehs/verification"><ShieldCheck className="mr-2 inline" size={16} />Verification</Link>
           <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/settings"><Settings className="mr-2 inline" size={16} />Settings</Link>
+          <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/system-health"><Database className="mr-2 inline" size={16} />System</Link>
           <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green" href="/auth/logout">Sign out</Link>
         </div>
       </header>

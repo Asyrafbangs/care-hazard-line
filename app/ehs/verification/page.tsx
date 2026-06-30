@@ -47,7 +47,7 @@ async function getPendingVerification(): Promise<{ items: VerificationItem[]; er
 }
 
 export default async function EhsVerificationQueuePage() {
-  await requireAppRole(["admin", "ehs", "hod"], "/dashboard/verification");
+  await requireAppRole(["admin", "ehs", "hod"], "/ehs/verification");
   const { items, error } = await getPendingVerification();
   const highOrUrgent = items.filter((item) => ["high", "urgent"].includes(item.final_urgency ?? item.ai_urgency ?? "medium")).length;
   const overdue = items.filter((item) => new Date(item.due_date) < new Date()).length;
@@ -61,7 +61,7 @@ export default async function EhsVerificationQueuePage() {
             <h1 className="text-3xl font-bold">Pending verification</h1>
             <p className="mt-2 max-w-3xl text-sm text-green-50">Review action owner closure evidence. Close only when the corrective action is effective.</p>
           </div>
-          <Link href="/dashboard" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green">Back to dashboard</Link>
+          <Link href="/ehs/dashboard" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green">Back to dashboard</Link>
         </div>
       </header>
 
@@ -108,7 +108,7 @@ function VerificationCard({ item }: { item: VerificationItem }) {
           </div>
           <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700"><strong>Required action:</strong> {item.action_required}</p>
         </div>
-        <Link href={`/dashboard/reports/${encodeURIComponent(item.report_no)}`} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-safety-green px-4 py-3 text-sm font-semibold text-white">
+        <Link href={`/ehs/reports/${encodeURIComponent(item.report_no)}`} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-safety-green px-4 py-3 text-sm font-semibold text-white">
           Verify action <ArrowRight size={16} />
         </Link>
       </div>
