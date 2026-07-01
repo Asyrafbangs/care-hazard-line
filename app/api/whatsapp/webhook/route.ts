@@ -5,6 +5,9 @@ import { normalizeWhatsAppPhone } from "@/lib/whatsapp/messages";
 import type { WhatsAppInboundMessage } from "@/lib/whatsapp/types";
 
 export const runtime = "nodejs";
+// Photo turns download media + run Gemini vision + a conversation call (each
+// with transient-error retries), so allow more headroom than the 10s default.
+export const maxDuration = 60;
 
 type WhatsAppWebhookMessage = {
   id?: string;

@@ -26,6 +26,40 @@ function getClient(): GoogleGenAI {
   return client;
 }
 
+// Gemini occasionally returns transient 503 "model overloaded" / 429 rate-limit
+// errors, especially at peak. These are safe to retry after a short wait.
+function isTransientError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes("503") ||
+    message.includes("unavailable") ||
+    message.includes("overloaded") ||
+    message.includes("high demand") ||
+    message.includes("429") ||
+    message.includes("resource_exhausted") ||
+    message.includes("rate limit")
+  );
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1 && isTransientError(error)) {
+        // Exponential backoff with jitter: ~0.5s, ~1.1s.
+        const delay = 500 * (attempt + 1) + Math.floor(Math.random() * 250);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Calls Gemini with a system instruction + conversation turns and forces a JSON
  * response matching `responseSchema`. Returns the parsed object, or null on any
@@ -41,19 +75,21 @@ export async function generateStructured<T>(input: {
 }): Promise<T | null> {
   try {
     const ai = getClient();
-    const response = await ai.models.generateContent({
-      model: getGeminiModel(),
-      contents: input.contents.map((turn) => ({
-        role: turn.role,
-        parts: [{ text: turn.text }]
-      })),
-      config: {
-        systemInstruction: input.systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: input.responseSchema as never,
-        temperature: input.temperature ?? 0.6
-      }
-    });
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: getGeminiModel(),
+        contents: input.contents.map((turn) => ({
+          role: turn.role,
+          parts: [{ text: turn.text }]
+        })),
+        config: {
+          systemInstruction: input.systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: input.responseSchema as never,
+          temperature: input.temperature ?? 0.6
+        }
+      })
+    );
 
     const text = response.text;
     if (!text) return null;
@@ -80,24 +116,26 @@ export async function generateStructuredVision<T>(input: {
 }): Promise<T | null> {
   try {
     const ai = getClient();
-    const response = await ai.models.generateContent({
-      model: getGeminiModel(),
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: input.mimeType, data: input.imageBase64 } },
-            { text: input.userText }
-          ]
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: getGeminiModel(),
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType: input.mimeType, data: input.imageBase64 } },
+              { text: input.userText }
+            ]
+          }
+        ],
+        config: {
+          systemInstruction: input.systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: input.responseSchema as never,
+          temperature: input.temperature ?? 0.4
         }
-      ],
-      config: {
-        systemInstruction: input.systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: input.responseSchema as never,
-        temperature: input.temperature ?? 0.4
-      }
-    });
+      })
+    );
 
     const text = response.text;
     if (!text) return null;
