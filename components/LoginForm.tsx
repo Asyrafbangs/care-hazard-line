@@ -45,6 +45,37 @@ export function LoginForm() {
     }
   }
 
+  async function sendReset() {
+    setMessage(null);
+
+    if (!email.trim()) {
+      setMessage({ type: "error", text: "Enter your email above first, then tap Forgot password." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        // Use the current origin so the email link returns to this site (not localhost).
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setMessage({
+        type: "success",
+        text: `Password reset link sent to ${email.trim()}. Check your email and open the link to set a new password.`
+      });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not send reset link." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className="mt-6 space-y-4">
       <label className="block text-sm font-semibold">
@@ -81,9 +112,14 @@ export function LoginForm() {
         <LockKeyhole size={18} /> {isSubmitting ? "Signing in..." : "Sign in"}
       </Button>
 
-      <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-100">
-        Create Supabase Auth users first using the same emails in the public.users table. On first login, the app automatically links auth_user_id by email.
-      </div>
+      <button
+        type="button"
+        onClick={sendReset}
+        disabled={isSubmitting}
+        className="w-full text-center text-sm font-semibold text-safety-green underline disabled:opacity-50"
+      >
+        Forgot password?
+      </button>
     </div>
   );
 }
