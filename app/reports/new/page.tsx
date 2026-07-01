@@ -1,10 +1,9 @@
-import { MobileShell } from "@/components/MobileShell";
 import { ReportFlow } from "@/components/ReportFlow";
 
 export default function NewReportPage() {
   return (
-    <MobileShell title="New hazard report" subtitle="Type issue, attach photo, choose location, review AI, then submit.">
+    <main className="mx-auto min-h-screen max-w-4xl bg-safety-soft px-4 py-6 safe-area">
       <ReportFlow />
-    </MobileShell>
+    </main>
   );
 }

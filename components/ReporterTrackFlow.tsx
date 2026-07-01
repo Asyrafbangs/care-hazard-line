@@ -1,49 +1,53 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Bell, CheckCircle2, Clock3, Languages, Search } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Camera, Check, Search } from "lucide-react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { statusLabel } from "@/lib/status";
+import { StatusBadge } from "@/components/StatusBadge";
+import { EmptyState } from "@/components/EmptyState";
 import type { ReportStatus } from "@/types/domain";
+
+type TrackReport = {
+  reportNo: string;
+  summary: string;
+  location: string | null;
+  status: ReportStatus;
+  urgency: string;
+  submittedAt: string;
+  closedAt: string | null;
+  updatedAt: string;
+};
 
 type TrackResult = {
   ok: boolean;
   reporterFound: boolean;
-  reporter?: {
-    name: string;
-    preferredLanguage: string;
-  };
-  reports: Array<{
-    reportNo: string;
-    summary: string;
-    location: string | null;
-    status: ReportStatus;
-    urgency: string;
-    submittedAt: string;
-    closedAt: string | null;
-    updatedAt: string;
-    assignments: Array<{
-      action_required?: string;
-      due_date?: string;
-      status?: ReportStatus;
-    }>;
-    history: Array<{
-      old_status?: string | null;
-      new_status?: ReportStatus;
-      comment?: string | null;
-      created_at?: string;
-    }>;
-    notifications: Array<{
-      channel?: string;
-      template_key?: string;
-      message_preview?: string;
-      status?: ReportStatus;
-      created_at?: string;
-    }>;
-  }>;
-  error?: string;
+  reporter?: { name: string; preferredLanguage: string };
+  reports: TrackReport[];
 };
+
+const STAGES: { key: string; label: string }[] = [
+  { key: "submitted", label: "Submitted" },
+  { key: "ehs_review", label: "Under EHS review" },
+  { key: "assigned", label: "Assigned" },
+  { key: "in_progress", label: "In progress" },
+  { key: "pending_verification", label: "Pending verification" },
+  { key: "closed", label: "Closed" }
+];
+
+function stageIndex(status: string): number {
+  const map: Record<string, number> = {
+    submitted: 0,
+    ehs_review: 1,
+    assigned: 2,
+    in_progress: 3,
+    reopened: 3,
+    pending_verification: 4,
+    closed: 5
+  };
+  return map[status] ?? 0;
+}
 
 export function ReporterTrackFlow() {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -55,12 +59,10 @@ export function ReporterTrackFlow() {
   async function searchStatus() {
     setError(null);
     setResult(null);
-
     if (phoneNumber.trim().length < 6) {
-      setError("Enter the phone number used when reporting.");
+      setError("Enter the phone number you used when reporting.");
       return;
     }
-
     setIsLoading(true);
     try {
       const response = await fetch("/api/reports/status", {
@@ -69,110 +71,123 @@ export function ReporterTrackFlow() {
         body: JSON.stringify({ phoneNumber, reportNo: reportNo.trim() || null })
       });
       const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error ?? "Could not load report status.");
-      }
-
+      if (!response.ok || !data.ok) throw new Error(data.error ?? "Could not load report status.");
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown tracking error.");
+      setError(err instanceof Error ? err.message : "Could not load report status.");
     } finally {
       setIsLoading(false);
     }
   }
 
+  function reset() {
+    setResult(null);
+    setError(null);
+    setReportNo("");
+  }
+
   return (
     <div className="space-y-4">
-      <Card>
-        <h2 className="flex items-center gap-2 text-lg font-bold"><Search size={20} /> Check report progress</h2>
-        <p className="mt-2 text-sm text-slate-600">Use the phone number you reported with — with or without the country code (e.g. 60123456789 or 0123456789). Report ID is optional if you want to see all your recent reports.</p>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Phone number</span>
-            <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-safety-green" placeholder="60123456789" />
-          </label>
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Report ID optional</span>
-            <input value={reportNo} onChange={(event) => setReportNo(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm uppercase outline-none focus:border-safety-green" placeholder="HZ-2026-0001" />
-          </label>
+      {!result ? (
+        <Card>
+          <h2 className="flex items-center gap-2 text-lg font-bold"><Search size={20} /> Check report status</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Enter the phone number you reported with — with or without the country code (e.g. 60123456789 or 0123456789).
+            Add your report ID to see one specific report.
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-semibold">
+              Phone number <span className="text-safety-red">*</span>
+              <input
+                value={phoneNumber}
+                onChange={(event) => setPhoneNumber(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-safety-green"
+                placeholder="60123456789"
+                inputMode="tel"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              Report ID <span className="text-xs font-normal text-slate-400">optional</span>
+              <input
+                value={reportNo}
+                onChange={(event) => setReportNo(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal uppercase outline-none focus:border-safety-green"
+                placeholder="HZ-2026-0001"
+              />
+            </label>
+          </div>
+          {error ? (
+            <p className="mt-4 flex items-center gap-1 rounded-2xl bg-red-50 p-3 text-sm text-red-700"><AlertTriangle size={15} /> {error}</p>
+          ) : null}
+          <Button onClick={searchStatus} disabled={isLoading} className="mt-5 w-full justify-center gap-2">
+            <Search size={18} /> {isLoading ? "Checking..." : "Check status"}
+          </Button>
+        </Card>
+      ) : (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-slate-600">
+            {result.reporterFound ? `Showing reports for ${result.reporter?.name ?? "you"}.` : "No matching reports."}
+          </p>
+          <button onClick={reset} className="text-sm font-semibold text-safety-green underline">Search again</button>
         </div>
-        {error ? <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-900 ring-1 ring-red-100"><AlertTriangle className="mr-2 inline" size={16} />{error}</div> : null}
-        <Button onClick={searchStatus} disabled={isLoading} className="mt-5 w-full justify-center gap-2"><Search size={18} /> {isLoading ? "Checking..." : "Check status"}</Button>
-      </Card>
+      )}
 
       {result && !result.reporterFound ? (
-        <Card>
-          <h2 className="text-lg font-bold">No report found</h2>
-          <p className="mt-2 text-sm text-slate-600">No reporter record was found for this phone number. Check the number or contact EHS.</p>
-        </Card>
+        <EmptyState
+          title="No report found"
+          description="We could not find a report for that phone number. Check the number, or contact EHS."
+          action={
+            <Link href="/reports/new" className="inline-flex items-center gap-2 rounded-2xl bg-safety-green px-4 py-2.5 text-sm font-bold text-white">
+              <Camera size={16} /> Report a hazard
+            </Link>
+          }
+        />
       ) : null}
 
-      {result?.reporterFound ? (
-        <Card>
-          <h2 className="text-lg font-bold">Hi {result.reporter?.name ?? "Reporter"}</h2>
-          <p className="mt-2 flex items-center gap-2 text-sm text-slate-600"><Languages size={16} /> Preferred language: {result.reporter?.preferredLanguage ?? "en"}</p>
-        </Card>
-      ) : null}
-
-      {result?.reports.map((report) => (
-        <Card key={report.reportNo}>
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500">{report.reportNo}</p>
-              <h3 className="mt-1 text-lg font-bold">{report.summary}</h3>
-              <p className="mt-2 text-sm text-slate-600">{report.location ?? "Location not set"}</p>
-            </div>
-            <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold capitalize text-safety-green">{report.urgency}</span>
-          </div>
-
-          <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-            <Info label="Current status" value={statusLabel(report.status)} />
-            <Info label="Submitted" value={new Date(report.submittedAt).toLocaleString()} />
-            <Info label="Last update" value={new Date(report.updatedAt).toLocaleString()} />
-          </div>
-
-          {report.assignments[0] ? (
-            <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-              <p className="font-bold">Assigned action</p>
-              <p className="mt-1">{report.assignments[0].action_required ?? "Action details pending."}</p>
-              <p className="mt-2 text-xs text-slate-500">Due: {report.assignments[0].due_date ?? "TBA"} · Status: {statusLabel(report.assignments[0].status ?? report.status)}</p>
-            </div>
-          ) : null}
-
-          {report.notifications.length > 0 ? (
-            <div className="mt-4 rounded-2xl bg-green-50 p-3 text-sm text-green-900 ring-1 ring-green-100">
-              <p className="flex items-center gap-2 font-bold"><Bell size={16} /> Reporter update</p>
-              <p className="mt-1">{report.notifications[0].message_preview}</p>
-              <p className="mt-2 text-xs">Channel placeholder: {report.notifications[0].channel} · Status: {report.notifications[0].status}</p>
-            </div>
-          ) : null}
-
-          <div className="mt-4 space-y-2">
-            <p className="flex items-center gap-2 text-sm font-bold"><Clock3 size={16} /> Status history</p>
-            {report.history.length > 0 ? report.history.slice(0, 5).map((item, index) => (
-              <div key={`${report.reportNo}-${index}`} className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-700">
-                <p className="font-bold">{statusLabel(item.new_status ?? "submitted")}</p>
-                <p className="mt-1">{item.comment ?? "Status updated."}</p>
-                <p className="mt-1 text-slate-400">{item.created_at ? new Date(item.created_at).toLocaleString() : ""}</p>
+      {result?.reports.map((report) => {
+        const current = stageIndex(report.status);
+        const cancelled = report.status === "cancelled";
+        return (
+          <Card key={report.reportNo}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-500">{report.reportNo}</p>
+                <h3 className="mt-1 text-lg font-bold text-safety-ink">{report.summary}</h3>
+                <p className="mt-1 text-sm text-slate-600">{report.location ?? "Location not set"}</p>
               </div>
-            )) : <p className="text-sm text-slate-600">No status history yet.</p>}
-          </div>
+              <StatusBadge value={report.status} />
+            </div>
 
-          {report.status === "closed" ? (
-            <div className="mt-4 rounded-2xl bg-green-50 p-3 text-sm text-green-900 ring-1 ring-green-100"><CheckCircle2 className="mr-2 inline" size={16} />This report has been verified and closed by EHS.</div>
-          ) : null}
-        </Card>
-      ))}
-    </div>
-  );
-}
+            {cancelled ? (
+              <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">This report was cancelled.</p>
+            ) : (
+              <ol className="mt-5">
+                {STAGES.map((stage, index) => {
+                  const done = index < current;
+                  const isCurrent = index === current;
+                  const isLast = index === STAGES.length - 1;
+                  return (
+                    <li key={stage.key} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-white ${done || isCurrent ? "bg-safety-green" : "bg-slate-200"}`}>
+                          {done ? <Check size={13} /> : isCurrent ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
+                        </span>
+                        {!isLast ? <span className={`w-0.5 flex-1 ${index < current ? "bg-safety-green" : "bg-slate-200"}`} style={{ minHeight: 22 }} /> : null}
+                      </div>
+                      <div className={`pb-4 ${isCurrent ? "font-bold text-safety-ink" : done ? "text-slate-600" : "text-slate-400"}`}>
+                        <p className="text-sm">{stage.label}</p>
+                        {isCurrent ? <p className="text-xs font-normal text-slate-500">Current status</p> : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
 
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-slate-800">{value}</p>
+            <p className="mt-1 text-xs text-slate-400">Last update: {new Date(report.updatedAt).toLocaleString()}</p>
+          </Card>
+        );
+      })}
     </div>
   );
 }
