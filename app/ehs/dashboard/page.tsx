@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Database, Filter, Settings, ShieldCheck } from "lucide-react";
+import { Bell, Database, Filter, Settings, ShieldCheck, Users } from "lucide-react";
 import { Card } from "@/components/Card";
 import { MetricCard } from "@/components/MetricCard";
 import { ReportCard } from "@/components/ReportCard";
@@ -73,6 +73,9 @@ export default async function DashboardPage() {
         <div className="flex gap-2">
           <span className="hidden rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold md:inline">{profile.appUser.name}</span>
           <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/ehs/verification"><ShieldCheck className="mr-2 inline" size={16} />Verification</Link>
+          {profile.appUser.role === "admin" ? (
+            <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/users"><Users className="mr-2 inline" size={16} />Users</Link>
+          ) : null}
           <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/settings"><Settings className="mr-2 inline" size={16} />Settings</Link>
           <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/system-health"><Database className="mr-2 inline" size={16} />System</Link>
           <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green" href="/auth/logout">Sign out</Link>
