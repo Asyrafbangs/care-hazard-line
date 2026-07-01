@@ -6,3 +6,6 @@ node_modules
 .DS_Store
 *.log
 tsconfig.tsbuildinfo
+
+# Local UI/screenshot audit artifacts (not part of the app)
+docs/screenshot-audit-*/
