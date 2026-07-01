@@ -7,8 +7,25 @@ const statusSchema = z.object({
   reportNo: z.string().trim().optional().nullable()
 });
 
-function normalizePhone(phoneNumber: string) {
-  return phoneNumber.replace(/[\s+()-]/g, "");
+// Reporters from WhatsApp are stored in full international digits (e.g. a
+// Malaysian number as 60XXXXXXXXX). Reporters often type the local 0-prefixed
+// form. Build the set of equivalent formats so either one matches.
+function phoneCandidates(phoneNumber: string): string[] {
+  const digits = phoneNumber.replace(/\D/g, "");
+  if (!digits) return [];
+
+  const set = new Set<string>([digits]);
+  if (digits.startsWith("0")) {
+    set.add(`60${digits.slice(1)}`); // 0xxxx -> 60xxxx
+    set.add(digits.slice(1)); // bare national number
+  } else if (digits.startsWith("60")) {
+    set.add(`0${digits.slice(2)}`); // 60xxxx -> 0xxxx
+    set.add(digits.slice(2)); // bare national number
+  } else {
+    set.add(`60${digits}`); // bare -> international
+    set.add(`0${digits}`); // bare -> local
+  }
+  return [...set];
 }
 
 type ReportRow = {
@@ -30,17 +47,19 @@ export async function POST(request: Request) {
   try {
     const payload = statusSchema.parse(await request.json());
     const supabase = createSupabaseAdmin();
-    const phoneNumber = normalizePhone(payload.phoneNumber);
+    const candidates = phoneCandidates(payload.phoneNumber);
 
-    const { data: reporter, error: reporterError } = await supabase
+    const { data: reporters, error: reporterError } = await supabase
       .from("reporters")
       .select("id, name, preferred_language")
-      .eq("phone_number", phoneNumber)
-      .maybeSingle();
+      .in("phone_number", candidates)
+      .limit(1);
 
     if (reporterError) {
       return NextResponse.json({ ok: false, error: reporterError.message }, { status: 500 });
     }
+
+    const reporter = reporters?.[0];
 
     if (!reporter) {
       return NextResponse.json({ ok: true, reporterFound: false, reports: [] });

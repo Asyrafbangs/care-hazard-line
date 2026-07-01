@@ -86,7 +86,7 @@ export function ReporterTrackFlow() {
     <div className="space-y-4">
       <Card>
         <h2 className="flex items-center gap-2 text-lg font-bold"><Search size={20} /> Check report progress</h2>
-        <p className="mt-2 text-sm text-slate-600">Use the phone number captured during reporting. Report ID is optional if you want to see all your recent reports.</p>
+        <p className="mt-2 text-sm text-slate-600">Use the phone number you reported with — with or without the country code (e.g. 60123456789 or 0123456789). Report ID is optional if you want to see all your recent reports.</p>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Phone number</span>
