@@ -21,6 +21,7 @@ export function EhsVerificationPanel({
 }) {
   const router = useRouter();
   const [decision, setDecision] = useState<"close" | "reopen">("close");
+  const [reopenReason, setReopenReason] = useState("");
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -28,17 +29,26 @@ export function EhsVerificationPanel({
   async function submitVerification() {
     setMessage(null);
 
+    if (decision === "reopen" && !reopenReason) {
+      setMessage({ type: "error", text: "Please select a reopen reason." });
+      return;
+    }
+
     if (comment.trim().length < 3) {
       setMessage({ type: "error", text: "Please add a verification comment." });
       return;
     }
+
+    // Reopen reason is stored as part of the verification comment so no
+    // database change is required.
+    const finalComment = decision === "reopen" ? `Reopen reason: ${reopenReason}. ${comment}` : comment;
 
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/reports/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportNo, assignmentId, decision, comment, verifiedByUserId: null })
+        body: JSON.stringify({ reportNo, assignmentId, decision, comment: finalComment, verifiedByUserId: null })
       });
 
       const result = await response.json();
@@ -87,7 +97,7 @@ export function EhsVerificationPanel({
               onClick={() => setDecision("close")}
               className={`rounded-2xl border p-3 text-left transition ${decision === "close" ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200 bg-white text-slate-700 hover:border-safety-green/40"}`}
             >
-              <span className="flex items-center gap-2 font-bold"><CheckCircle2 size={17} /> Accept and close</span>
+              <span className="flex items-center gap-2 font-bold"><CheckCircle2 size={17} /> Accept Closure</span>
               <span className="mt-1 block text-xs text-slate-500">Use this when evidence is sufficient and hazard is controlled.</span>
             </button>
             <button
@@ -96,11 +106,30 @@ export function EhsVerificationPanel({
               onClick={() => setDecision("reopen")}
               className={`rounded-2xl border p-3 text-left transition ${decision === "reopen" ? "border-amber-400 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-700 hover:border-amber-300"}`}
             >
-              <span className="flex items-center gap-2 font-bold"><RotateCcw size={17} /> Reject and reopen</span>
+              <span className="flex items-center gap-2 font-bold"><RotateCcw size={17} /> Reopen Action</span>
               <span className="mt-1 block text-xs text-slate-500">Use this when further action or better evidence is needed.</span>
             </button>
           </div>
         </div>
+
+        {decision === "reopen" ? (
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Reopen reason <span className="text-safety-red">*</span></span>
+            <select
+              value={reopenReason}
+              onChange={(event) => setReopenReason(event.target.value)}
+              disabled={!canVerify || isSubmitting}
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-safety-green"
+            >
+              <option value="">Select a reason</option>
+              <option value="Evidence insufficient">Evidence insufficient</option>
+              <option value="Action not completed">Action not completed</option>
+              <option value="Wrong corrective action">Wrong corrective action</option>
+              <option value="Additional control required">Additional control required</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+        ) : null}
 
         <label className="block">
           <span className="text-xs font-bold uppercase tracking-wide text-slate-500">EHS verification comment</span>
@@ -120,9 +149,9 @@ export function EhsVerificationPanel({
           </div>
         ) : null}
 
-        <Button onClick={submitVerification} disabled={!canVerify || isSubmitting} className="w-full justify-center">
+        <Button onClick={submitVerification} disabled={!canVerify || isSubmitting} variant={decision === "reopen" ? "danger" : "primary"} className="w-full justify-center gap-2">
           {decision === "close" ? <CheckCircle2 size={18} /> : <RotateCcw size={18} />}
-          {isSubmitting ? "Saving verification..." : decision === "close" ? "Accept and close report" : "Reject and reopen action"}
+          {isSubmitting ? "Saving..." : decision === "close" ? "Accept Closure" : "Reopen Action"}
         </Button>
       </div>
     </Card>

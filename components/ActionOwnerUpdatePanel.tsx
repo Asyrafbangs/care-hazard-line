@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Camera, CheckCircle2, Send } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Send } from "lucide-react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { PhotoUploadCard } from "@/components/PhotoUploadCard";
 import { statusLabel } from "@/lib/status";
 import type { ReportStatus } from "@/types/domain";
 
@@ -138,11 +139,7 @@ export function ActionOwnerUpdatePanel({
         </span>
       </div>
 
-      <div className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-100">
-        <div className="flex gap-2"><AlertTriangle size={18} />
-          <p><strong>Privacy:</strong> do not ask for reporter name or phone number. Contact EHS if clarification is needed.</p>
-        </div>
-      </div>
+      <p className="mt-3 text-xs text-slate-500">Reporter hidden for privacy. Contact EHS if clarification is needed.</p>
 
       <div className="mt-5 grid gap-4">
         <div>
@@ -176,22 +173,13 @@ export function ActionOwnerUpdatePanel({
         </label>
 
         {status === "pending_verification" ? (
-          <label className="block rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><Camera size={15} /> Closure evidence photo</span>
-            <input
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              disabled={isLocked || isSubmitting}
-              onChange={(event) => setClosurePhotoFile(event.target.files?.[0] ?? null)}
-            />
-            {closurePhotoFile ? (
-              <p className="mt-2 rounded-xl bg-green-50 p-2 text-sm text-green-800">Closure evidence selected: {closurePhotoFile.name}</p>
-            ) : (
-              <p className="mt-2 text-xs text-amber-700">Required before submitting to EHS verification.</p>
-            )}
-          </label>
+          <PhotoUploadCard
+            label="Closure photo"
+            file={closurePhotoFile}
+            onChange={setClosurePhotoFile}
+            required
+            error={!closurePhotoFile ? "Required before submitting to EHS verification." : undefined}
+          />
         ) : null}
 
         {message ? (
@@ -200,8 +188,8 @@ export function ActionOwnerUpdatePanel({
           </div>
         ) : null}
 
-        <Button onClick={submitUpdate} disabled={isSubmitting || isLocked} className="w-full justify-center">
-          <Send size={18} /> {isSubmitting ? "Saving update..." : status === "pending_verification" ? "Submit closure evidence to EHS" : "Save progress update"}
+        <Button onClick={submitUpdate} disabled={isSubmitting || isLocked} className="w-full justify-center gap-2">
+          <Send size={18} /> {isSubmitting ? "Saving..." : status === "pending_verification" ? "Submit to EHS Verification" : "Save Progress"}
         </Button>
       </div>
     </Card>

@@ -151,8 +151,8 @@ export function EhsAssignmentPanel({
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold"><UserCheck size={20} />EHS final review and assignment</h2>
-          <p className="mt-2 text-sm text-slate-600">Confirm the risk, assign the owner, set the due date, and record the action required. Reporter identity is not sent to the action owner.</p>
+          <h2 className="flex items-center gap-2 text-lg font-bold"><UserCheck size={20} />EHS decision</h2>
+          <p className="mt-2 text-sm text-slate-600">Confirm the risk, assign the owner, and set the due date. Reporter identity is never sent to the action owner.</p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{statusLabel(reportStatus)}</span>
       </div>
@@ -218,7 +218,7 @@ export function EhsAssignmentPanel({
           </label>
 
           <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">EHS comment</span>
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Internal note</span>
             <input value={ehsComment} onChange={(event) => setEhsComment(event.target.value)} placeholder="Optional internal note" className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-safety-green" />
           </label>
         </div>
@@ -230,7 +230,7 @@ export function EhsAssignmentPanel({
         </div>
 
         {aiSuggestedOwnerDepartment ? (
-          <p className="text-xs text-slate-500">AI suggested owner/department: <strong>{aiSuggestedOwnerDepartment}</strong></p>
+          <p className="text-xs text-slate-500">Suggested owner/department: <strong>{aiSuggestedOwnerDepartment}</strong></p>
         ) : null}
 
         {message ? (
@@ -239,8 +239,8 @@ export function EhsAssignmentPanel({
           </div>
         ) : null}
 
-        <Button onClick={submitAssignment} disabled={isSubmitting} className="w-full justify-center">
-          <Send size={18} /> {isSubmitting ? "Saving assignment..." : existingAssignment ? "Update assignment" : "Assign action owner"}
+        <Button onClick={submitAssignment} disabled={isSubmitting} className="w-full justify-center gap-2">
+          <Send size={18} /> {isSubmitting ? "Saving..." : existingAssignment ? "Update Assignment" : "Assign Action"}
         </Button>
       </div>
     </Card>

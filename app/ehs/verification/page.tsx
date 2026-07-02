@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock3, ImageIcon, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/Card";
+import { ConsoleHeader } from "@/components/ConsoleHeader";
+import { EmptyState } from "@/components/EmptyState";
 import { MetricCard } from "@/components/MetricCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { statusLabel } from "@/lib/status";
 import { requireAppRole } from "@/lib/auth";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
 
@@ -54,16 +56,14 @@ export default async function EhsVerificationQueuePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
-      <header className="mb-6 rounded-3xl bg-safety-green p-6 text-white shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-green-100">EHS verification queue</p>
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Pending verification</h1>
-            <p className="mt-2 max-w-3xl text-sm text-green-50">Review action owner closure evidence. Close only when the corrective action is effective.</p>
-          </div>
-          <Link href="/ehs/dashboard" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green">Back to dashboard</Link>
-        </div>
-      </header>
+      <div className="mb-4">
+        <ConsoleHeader
+          eyebrow="EHS Console"
+          title="Verification queue"
+          description="Review closure evidence. Accept only when the corrective action is effective."
+          actions={<Link href="/ehs/dashboard" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600">Back to dashboard</Link>}
+        />
+      </div>
 
       {error ? (
         <div className="mb-4 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">Verification queue warning: {error}</div>
@@ -77,10 +77,11 @@ export default async function EhsVerificationQueuePage() {
 
       <section className="mt-6 space-y-3">
         {items.length > 0 ? items.map((item) => <VerificationCard key={item.assignment_id} item={item} />) : (
-          <Card>
-            <h2 className="flex items-center gap-2 text-lg font-bold"><CheckCircle2 size={20} />No pending verification</h2>
-            <p className="mt-2 text-sm text-slate-600">Action owner submissions will appear here after they upload closure evidence.</p>
-          </Card>
+          <EmptyState
+            icon={<CheckCircle2 size={20} />}
+            title="No pending verification"
+            description="Action owner submissions will appear here after they upload closure evidence."
+          />
         )}
       </section>
     </main>
@@ -96,8 +97,9 @@ function VerificationCard({ item }: { item: VerificationItem }) {
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">{statusLabel(item.assignment_status)}</span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold capitalize text-slate-700">{urgency}</span>
+            <StatusBadge value={item.assignment_status} />
+            <StatusBadge value={urgency} />
+            {new Date(item.due_date) < new Date() ? <StatusBadge value="overdue" /> : null}
           </div>
           <h2 className="mt-3 text-xl font-bold text-safety-ink">{item.report_no}</h2>
           <p className="mt-2 text-sm text-slate-600">{item.ai_hazard_summary ?? item.original_description}</p>
@@ -109,7 +111,7 @@ function VerificationCard({ item }: { item: VerificationItem }) {
           <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700"><strong>Required action:</strong> {item.action_required}</p>
         </div>
         <Link href={`/ehs/reports/${encodeURIComponent(item.report_no)}`} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-safety-green px-4 py-3 text-sm font-semibold text-white">
-          Verify action <ArrowRight size={16} />
+          View Evidence <ArrowRight size={16} />
         </Link>
       </div>
     </Card>

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, Clock3, LockKeyhole, MapPin, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, Clock3, MapPin, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/Card";
+import { ConsoleHeader } from "@/components/ConsoleHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import { SecurePhotoPreview } from "@/components/SecurePhotoPreview";
 import { ActionOwnerUpdatePanel } from "@/components/ActionOwnerUpdatePanel";
 import { getActionOwnerIdForUser, requireAppRole } from "@/lib/auth";
@@ -135,19 +137,21 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
-      <Link href={`/actions?ownerId=${action.action_owner_id}`} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to actions</Link>
+      <Link href={`/owner/actions?ownerId=${action.action_owner_id}`} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-800"><ArrowLeft size={16} />Back to actions</Link>
 
-      <header className="mb-6 rounded-3xl bg-safety-green p-6 text-white shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-green-100">Privacy-safe action detail</p>
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">{action.report_no}</h1>
-            <p className="mt-2 max-w-3xl text-sm text-green-50">{action.ai_hazard_summary ?? action.original_description}</p>
-            <p className="mt-2 text-xs text-green-100">Signed in as {profile.appUser.name}</p>
-          </div>
-          <div className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold capitalize">{urgency}</div>
-        </div>
-      </header>
+      <div className="mb-4">
+        <ConsoleHeader
+          eyebrow="My Action"
+          title={action.report_no}
+          description={action.ai_hazard_summary ?? action.original_description}
+          actions={
+            <>
+              <StatusBadge value={urgency} />
+              {isOverdue ? <StatusBadge value="overdue" /> : <StatusBadge value={action.assignment_status} />}
+            </>
+          }
+        />
+      </div>
 
       {error ? (
         <div className="mb-4 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
@@ -170,11 +174,6 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
             </div>
           </Card>
 
-          <Card>
-            <div className="flex items-center gap-2 text-lg font-bold"><LockKeyhole size={20} />Reporter privacy</div>
-            <p className="mt-2 text-sm text-slate-600">This page uses the action-owner privacy view. Reporter name, phone number, employee ID, and visitor company are not loaded here.</p>
-          </Card>
-
           <ActionOwnerUpdatePanel
             assignmentId={action.assignment_id}
             currentAssignmentStatus={action.assignment_status}
@@ -184,8 +183,8 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
 
         <div className="space-y-4">
           <Card>
-            <div className="flex items-center gap-2 text-lg font-bold"><ShieldCheck size={20} />Photo evidence</div>
-            <p className="mt-2 text-sm text-slate-600">Action owner can view hazard evidence through a temporary signed URL. Reporter details remain hidden.</p>
+            <div className="flex items-center gap-2 text-lg font-bold"><ShieldCheck size={20} />Hazard photo</div>
+            <p className="mt-2 text-sm text-slate-600">Reporter hidden for privacy.</p>
           </Card>
 
           {hazardPhoto ? (
@@ -199,13 +198,13 @@ export default async function ActionDetailPage({ params }: { params: Promise<{ a
           ) : (
             <Card>
               <h2 className="text-lg font-bold">No hazard photo available</h2>
-              <p className="mt-2 text-sm text-slate-600">This report may have been created before Supabase Storage upload was enabled.</p>
+              <p className="mt-2 text-sm text-slate-600">This report has no photo on record.</p>
             </Card>
           )}
 
           <Card>
             <h2 className="text-lg font-bold">Closure evidence</h2>
-            <p className="mt-2 text-sm text-slate-600">Closure evidence uploaded by the action owner is stored privately and can be viewed with a temporary signed URL.</p>
+            <p className="mt-2 text-sm text-slate-600">Your uploaded closure photos appear here.</p>
           </Card>
 
           {closurePhotos.length > 0 ? closurePhotos.map((photo) => (

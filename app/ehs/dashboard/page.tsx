@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { Bell, Database, Filter, Settings, ShieldCheck, Users } from "lucide-react";
+import { Activity, ArrowRight, Database, Settings, ShieldCheck, Users } from "lucide-react";
 import { Card } from "@/components/Card";
+import { ConsoleHeader } from "@/components/ConsoleHeader";
+import { EmptyState } from "@/components/EmptyState";
 import { MetricCard } from "@/components/MetricCard";
 import { ReportCard } from "@/components/ReportCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { sampleReports } from "@/lib/dummy-data";
 import { requireAppRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
@@ -20,17 +23,23 @@ type DashboardReport = {
   createdAt: string;
 };
 
-async function getReports(): Promise<{ reports: DashboardReport[]; source: "supabase" | "dummy"; error?: string }> {
+type QueueData = {
+  reports: DashboardReport[];
+  overdueReportNos: Set<string>;
+  error?: string;
+};
+
+async function getQueue(): Promise<QueueData> {
   try {
     const supabase = createSupabaseAdmin();
     const { data, error } = await supabase
       .from("ehs_report_detail")
-      .select("report_no, ai_hazard_summary, ai_category_name, ai_urgency, final_urgency, status, location_name, location_text, created_at")
+      .select("id, report_no, ai_hazard_summary, ai_category_name, ai_urgency, final_urgency, status, location_name, location_text, created_at")
       .order("created_at", { ascending: false })
-      .limit(25);
+      .limit(100);
 
     if (error) {
-      return { reports: sampleReports, source: "dummy", error: error.message };
+      return { reports: sampleReports, overdueReportNos: new Set(), error: error.message };
     }
 
     const reports = (data ?? []).map((item) => ({
@@ -43,95 +52,167 @@ async function getReports(): Promise<{ reports: DashboardReport[]; source: "supa
       createdAt: item.created_at
     }));
 
-    return { reports, source: "supabase" };
+    // Overdue = open assignment past its due date.
+    const idByNo = new Map((data ?? []).map((item) => [item.id as string, item.report_no as string]));
+    const { data: assignments } = await supabase
+      .from("report_assignments")
+      .select("report_id, due_date, status")
+      .not("status", "in", "(closed,cancelled)");
+
+    const today = new Date();
+    const overdueReportNos = new Set<string>();
+    (assignments ?? []).forEach((assignment) => {
+      if (assignment.due_date && new Date(assignment.due_date) < today) {
+        const reportNo = idByNo.get(assignment.report_id);
+        if (reportNo) overdueReportNos.add(reportNo);
+      }
+    });
+
+    return { reports, overdueReportNos };
   } catch (error) {
     return {
       reports: sampleReports,
-      source: "dummy",
-      error: error instanceof Error ? error.message : "Dashboard data fallback used."
+      overdueReportNos: new Set(),
+      error: error instanceof Error ? error.message : "Report queue could not be loaded."
     };
   }
 }
 
-export default async function DashboardPage() {
+const TABS = [
+  { key: "new", label: "New" },
+  { key: "urgent", label: "Urgent" },
+  { key: "overdue", label: "Overdue" },
+  { key: "verify", label: "Verify" },
+  { key: "all", label: "All" }
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
+
+export default async function DashboardPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   const profile = await requireAppRole(["admin", "ehs", "hod"], "/ehs/dashboard");
-  const { reports, source, error } = await getReports();
-  const urgent = reports.filter((report) => report.urgency === "urgent" || report.urgency === "high").length;
-  const newReports = reports.filter((report) => report.status === "submitted" || report.status === "ehs_review").length;
-  const openReports = reports.filter((report) => !["closed", "cancelled"].includes(report.status)).length;
+  const params = searchParams ? await searchParams : {};
+  const tab: TabKey = (TABS.some((item) => item.key === params.tab) ? params.tab : "new") as TabKey;
+  const { reports, overdueReportNos, error } = await getQueue();
+
+  const isOpen = (report: DashboardReport) => !["closed", "cancelled"].includes(report.status);
+  const newReports = reports.filter((report) => ["submitted", "ehs_review"].includes(report.status));
+  const urgentReports = reports.filter((report) => ["urgent", "high"].includes(report.urgency) && isOpen(report));
+  const overdueReports = reports.filter((report) => overdueReportNos.has(report.reportNo) && isOpen(report));
+  const verifyReports = reports.filter((report) => report.status === "pending_verification");
+
+  const filtered: Record<TabKey, DashboardReport[]> = {
+    new: newReports,
+    urgent: urgentReports,
+    overdue: overdueReports,
+    verify: verifyReports,
+    all: reports
+  };
+  const queue = filtered[tab];
+
+  const attentionList = [...verifyReports, ...overdueReports, ...urgentReports]
+    .filter((report, index, list) => list.findIndex((item) => item.reportNo === report.reportNo) === index)
+    .slice(0, 5);
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
-      <header className="mb-6 flex flex-col gap-4 rounded-3xl bg-safety-green p-6 text-white shadow-card md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-green-100">EHS Console</p>
-          <h1 className="mt-2 text-3xl font-bold">CARE Hazard Dashboard</h1>
-          <p className="mt-2 text-sm text-green-50">
-            {source === "supabase" ? "Reading live reports from Supabase." : "Using dummy fallback data because Supabase data could not be loaded."}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <span className="hidden rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold md:inline">{profile.appUser.name}</span>
-          <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/ehs/verification"><ShieldCheck className="mr-2 inline" size={16} />Verification</Link>
-          {profile.appUser.role === "admin" ? (
-            <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/users"><Users className="mr-2 inline" size={16} />Users</Link>
-          ) : null}
-          <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/settings"><Settings className="mr-2 inline" size={16} />Settings</Link>
-          <Link className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold" href="/admin/system-health"><Database className="mr-2 inline" size={16} />System</Link>
-          <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green" href="/auth/logout">Sign out</Link>
-        </div>
-      </header>
+      <div className="space-y-4">
+        <ConsoleHeader
+          eyebrow="EHS Console"
+          title="EHS Triage Inbox"
+          description={`Signed in as ${profile.appUser.name}. What needs an EHS decision now?`}
+          actions={
+            <>
+              <Link className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600" href="/ehs/verification"><ShieldCheck className="mr-1 inline" size={15} />Verification</Link>
+              {profile.appUser.role === "admin" ? (
+                <Link className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600" href="/admin/users"><Users className="mr-1 inline" size={15} />Users</Link>
+              ) : null}
+              <Link className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600" href="/admin/settings"><Settings className="mr-1 inline" size={15} />Settings</Link>
+              <Link className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600" href="/admin/system-health"><Database className="mr-1 inline" size={15} />System</Link>
+              <Link className="rounded-2xl bg-blue-800 px-3 py-2 text-sm font-semibold text-white" href="/auth/logout">Sign out</Link>
+            </>
+          }
+        />
 
-      {error ? (
-        <div className="mb-4 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
-          <Database className="mr-2 inline" size={16} /> Dashboard fallback: {error}
-        </div>
-      ) : null}
-
-      <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="New reports" value={newReports} note="Submitted / EHS review" />
-        <MetricCard label="Urgent / High" value={urgent} note="Immediate EHS alert" />
-        <MetricCard label="Open reports" value={openReports} note="Not closed or cancelled" />
-        <MetricCard label="Total loaded" value={reports.length} note={source === "supabase" ? "From Supabase" : "Dummy fallback"} />
-      </section>
-
-      <section className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">Priority queue</h2>
-            <button className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"><Filter className="mr-2 inline" size={16} />Filter</button>
+        {error ? (
+          <div className="rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
+            Some data could not be loaded just now. Showing what is available. ({error})
           </div>
-          {reports.length > 0 ? reports.map((report) => (
-            <ReportCard key={report.reportNo} {...report} />
-          )) : (
-            <Card>
-              <h2 className="text-lg font-bold">No reports yet</h2>
-              <p className="mt-2 text-sm text-slate-600">Submit a report from the mobile reporting flow to see it here.</p>
-            </Card>
-          )}
-        </div>
+        ) : null}
 
-        <div className="space-y-4">
-          <Card>
-            <h2 className="flex items-center gap-2 text-lg font-bold"><Bell size={18} /> Alerts</h2>
-            <div className="mt-4 space-y-3 text-sm text-slate-700">
-              <p className="rounded-2xl bg-red-50 p-3 text-red-800">High-risk and urgent reports create pending EHS alert records.</p>
-              <p className="rounded-2xl bg-amber-50 p-3 text-amber-800">Action owner visibility excludes reporter name and phone number.</p>
-              <p className="rounded-2xl bg-green-50 p-3 text-green-800">Reporter progress tracking and closure update placeholders are enabled.</p>
-            </div>
-          </Card>
-          <Card>
-            <h2 className="text-lg font-bold">Phase 3C status</h2>
-            <div className="mt-4 space-y-3 text-sm text-slate-700">
-              <p>Database reporting: <strong>enabled</strong></p>
-              <p>Photo storage: <strong>Supabase Storage enabled</strong></p>
-              <p>Closure evidence: <strong>enabled</strong></p>
-              <p>EHS verification: <strong>enabled</strong></p>
-              <p>Dashboard source: <strong>{source}</strong></p>
-            </div>
-          </Card>
-        </div>
-      </section>
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MetricCard label="New reports" value={newReports.length} note="Waiting for EHS review" />
+          <MetricCard label="Urgent / High" value={urgentReports.length} note="Open high-risk reports" />
+          <MetricCard label="Overdue actions" value={overdueReports.length} note="Past the due date" />
+          <MetricCard label="Pending verification" value={verifyReports.length} note="Closure to verify" />
+        </section>
+
+        <nav className="flex flex-wrap gap-2" aria-label="Report queue filter">
+          {TABS.map((item) => {
+            const count = filtered[item.key].length;
+            const active = item.key === tab;
+            return (
+              <Link
+                key={item.key}
+                href={`/ehs/dashboard?tab=${item.key}`}
+                aria-current={active ? "page" : undefined}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+                  active ? "bg-blue-800 text-white ring-blue-800" : "bg-white text-slate-600 ring-slate-200 hover:ring-blue-300"
+                }`}
+              >
+                {item.label} <span className={active ? "text-blue-100" : "text-slate-400"}>{count}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <section className="grid gap-4 lg:grid-cols-[1.5fr_0.9fr]">
+          <div className="space-y-3">
+            {queue.length > 0 ? (
+              queue.map((report) => <ReportCard key={report.reportNo} {...report} />)
+            ) : (
+              <EmptyState
+                icon={<ShieldCheck size={20} />}
+                title={tab === "new" ? "No new reports" : "Nothing here right now"}
+                description={tab === "new" ? "New hazard reports will appear here for triage." : "Reports matching this filter will appear here."}
+              />
+            )}
+          </div>
+
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <Card>
+              <h2 className="flex items-center gap-2 text-base font-bold"><Activity size={17} /> Needs attention now</h2>
+              <div className="mt-3 space-y-2">
+                {attentionList.length > 0 ? (
+                  attentionList.map((report) => (
+                    <Link
+                      key={report.reportNo}
+                      href={`/ehs/reports/${encodeURIComponent(report.reportNo)}`}
+                      className="block rounded-2xl border border-slate-100 p-3 transition hover:border-blue-300"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-slate-500">{report.reportNo}</p>
+                        <StatusBadge value={overdueReportNos.has(report.reportNo) ? "overdue" : report.status === "pending_verification" ? report.status : report.urgency} />
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm font-semibold text-safety-ink">{report.summary}</p>
+                      <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-blue-800">Open Report <ArrowRight size={13} /></p>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="rounded-2xl bg-green-50 p-3 text-sm text-green-800">All clear — nothing urgent, overdue, or pending verification.</p>
+                )}
+              </div>
+            </Card>
+
+            <Card>
+              <h2 className="text-base font-bold">Quick links</h2>
+              <div className="mt-3 grid gap-2 text-sm font-semibold">
+                <Link href="/ehs/verification" className="rounded-2xl bg-slate-50 px-4 py-3 text-slate-700 hover:bg-slate-100">EHS verification queue</Link>
+                <Link href="/owner/actions" className="rounded-2xl bg-slate-50 px-4 py-3 text-slate-700 hover:bg-slate-100">Action owner queues</Link>
+              </div>
+            </Card>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

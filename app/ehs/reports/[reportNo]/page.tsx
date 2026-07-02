@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, LockKeyhole, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, MapPin, Phone, UserRound } from "lucide-react";
 import { Card } from "@/components/Card";
+import { ConsoleHeader } from "@/components/ConsoleHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import { SecurePhotoPreview } from "@/components/SecurePhotoPreview";
 import { EhsAssignmentPanel } from "@/components/EhsAssignmentPanel";
 import { EhsVerificationPanel } from "@/components/EhsVerificationPanel";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { statusLabel } from "@/lib/status";
 import { requireAppRole } from "@/lib/auth";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
 
@@ -234,148 +235,133 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
-      <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to dashboard</Link>
+      <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-800"><ArrowLeft size={16} />Back to dashboard</Link>
 
-      <header className="mb-6 rounded-3xl bg-safety-green p-6 text-white shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-green-100">EHS secure report detail</p>
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">{report.report_no}</h1>
-            <p className="mt-2 max-w-3xl text-sm text-green-50">{report.ai_hazard_summary ?? report.original_description}</p>
+      <div className="space-y-4">
+        <ConsoleHeader
+          eyebrow="EHS Report Detail"
+          title={report.report_no}
+          description={report.ai_hazard_summary ?? report.original_description}
+          actions={
+            <>
+              <StatusBadge value={urgency} />
+              <StatusBadge value={report.status} />
+            </>
+          }
+        />
+
+        {error ? (
+          <div className="rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
+            Some report data could not be loaded: {error}
           </div>
-          <div className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold capitalize">{urgency}</div>
-        </div>
-      </header>
+        ) : null}
 
-      {error ? (
-        <div className="mb-4 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
-          Photo/data warning: {error}
-        </div>
-      ) : null}
+        <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* Left: evidence and context */}
+          <div className="space-y-4">
+            <Card>
+              <div className="flex items-center gap-2 text-lg font-bold"><AlertTriangle size={20} />Hazard summary</div>
+              <div className="mt-4 grid gap-3 text-sm">
+                <Info label="Location" value={location} icon={<MapPin size={15} />} />
+                <Info label="Reporter description" value={report.original_description} />
+                <Info label="Suggested summary" value={report.ai_hazard_summary ?? "Pending EHS review"} />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Info label="Suggested category" value={report.ai_category_name ?? "Pending category"} />
+                  <Info label="Suggested urgency" value={(report.ai_urgency ?? "medium").toString()} />
+                </div>
+                <Info label="Suggested immediate action" value={report.ai_recommended_immediate_action ?? "EHS to review"} />
+                <Info label="Suggested owner / department" value={report.ai_suggested_owner_department ?? "EHS review required"} />
+                <Info label="Reporter confirmed the summary" value={report.reporter_confirmed_ai_summary ? "Yes" : "No"} icon={<CheckCircle2 size={15} />} />
+              </div>
+            </Card>
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-4">
-          <Card>
-            <div className="flex items-center gap-2 text-lg font-bold"><AlertTriangle size={20} />Hazard review</div>
-            <div className="mt-4 grid gap-3 text-sm">
-              <Info label="Status" value={statusLabel(report.status)} />
-              <Info label="Location" value={location} icon={<MapPin size={15} />} />
-              <Info label="Original description" value={report.original_description} />
-              <Info label="AI summary" value={report.ai_hazard_summary ?? "Pending EHS review"} />
-              <Info label="Suggested category" value={report.ai_category_name ?? "Pending category"} />
-              <Info label="Recommended immediate action" value={report.ai_recommended_immediate_action ?? "EHS to review"} />
-              <Info label="Suggested owner / department" value={report.ai_suggested_owner_department ?? "EHS review required"} />
-              <Info label="Reporter confirmed AI summary" value={report.reporter_confirmed_ai_summary ? "Yes" : "No"} icon={<CheckCircle2 size={15} />} />
-            </div>
-          </Card>
+            {hazardPhoto ? (
+              <SecurePhotoPreview
+                reportNo={report.report_no}
+                photoId={hazardPhoto.id}
+                photoType="hazard"
+                viewerRole="ehs"
+                fileName={hazardPhoto.original_file_name}
+              />
+            ) : (
+              <Card>
+                <h2 className="text-lg font-bold">No hazard photo</h2>
+                <p className="mt-2 text-sm text-slate-600">This report has no photo on record.</p>
+              </Card>
+            )}
 
-          <Card>
-            <div className="flex items-center gap-2 text-lg font-bold"><UserRound size={20} />Reporter details visible to EHS</div>
-            <p className="mt-2 text-sm text-slate-600">This panel uses the EHS view. Action owner screens must use the privacy-safe view and must not show reporter name or phone number.</p>
-            <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-              <Info label="Name" value={report.reporter_name} />
-              <Info label="Phone" value={report.reporter_phone_number} icon={<Phone size={15} />} />
-              <Info label="Category" value={report.reporter_category} />
-              <Info label="Employee ID / Company" value={report.employee_id ?? report.company_name ?? "Not provided"} />
-              <Info label="Preferred language" value={report.preferred_language} />
-            </div>
-          </Card>
+            <Card>
+              <div className="flex items-center gap-2 text-lg font-bold"><UserRound size={20} />Reporter details</div>
+              <p className="mt-2 text-sm text-slate-600">Visible to EHS only. Action owners never see the reporter&rsquo;s name or phone number.</p>
+              <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+                <Info label="Name" value={report.reporter_name} />
+                <Info label="Phone" value={report.reporter_phone_number} icon={<Phone size={15} />} />
+                <Info label="Category" value={report.reporter_category} />
+                <Info label="Employee ID / Company" value={report.employee_id ?? report.company_name ?? "Not provided"} />
+              </div>
+            </Card>
 
-          <EhsAssignmentPanel
-            reportNo={report.report_no}
-            reportStatus={report.status}
-            aiCategoryName={report.ai_category_name}
-            aiUrgency={report.ai_urgency}
-            finalUrgency={report.final_urgency}
-            finalCategoryId={report.final_category_id}
-            aiRecommendedImmediateAction={report.ai_recommended_immediate_action}
-            aiSuggestedOwnerDepartment={report.ai_suggested_owner_department}
-            actionOwners={actionOwners}
-            categories={categories}
-            existingAssignment={assignment}
-          />
+            {closurePhotos.length > 0 ? (
+              <Card>
+                <h2 className="text-lg font-bold">Closure evidence</h2>
+                <p className="mt-2 text-sm text-slate-600">Review the closure photos before accepting or reopening the action.</p>
+              </Card>
+            ) : null}
+            {closurePhotos.map((photo) => (
+              <SecurePhotoPreview
+                key={photo.id}
+                reportNo={report.report_no}
+                photoId={photo.id}
+                photoType="closure"
+                viewerRole="ehs"
+                fileName={photo.original_file_name}
+              />
+            ))}
 
-          {assignment ? (
-            <EhsVerificationPanel
+            <Card>
+              <h2 className="text-lg font-bold">Timeline</h2>
+              <div className="mt-4 space-y-2 text-sm text-slate-700">
+                {actionUpdates.length > 0 ? actionUpdates.map((update) => (
+                  <div key={update.id} className="rounded-2xl bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <StatusBadge value={update.status} />
+                      <p className="text-xs text-slate-400">{new Date(update.created_at).toLocaleString()}</p>
+                    </div>
+                    <p className="mt-2 text-slate-600">{update.comment ?? "No comment."}</p>
+                    {update.closure_photo_id ? <p className="mt-2 text-xs font-semibold text-safety-green">Closure photo attached</p> : null}
+                  </div>
+                )) : <p className="text-slate-500">No action updates yet.</p>}
+              </div>
+            </Card>
+          </div>
+
+          {/* Right: sticky decision panel */}
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <EhsAssignmentPanel
               reportNo={report.report_no}
-              assignmentId={assignment.id}
               reportStatus={report.status}
-              assignmentStatus={assignment.status}
+              aiCategoryName={report.ai_category_name}
+              aiUrgency={report.ai_urgency}
+              finalUrgency={report.final_urgency}
+              finalCategoryId={report.final_category_id}
+              aiRecommendedImmediateAction={report.ai_recommended_immediate_action}
+              aiSuggestedOwnerDepartment={report.ai_suggested_owner_department}
+              actionOwners={actionOwners}
+              categories={categories}
+              existingAssignment={assignment}
             />
-          ) : null}
 
-          <Card>
-            <h2 className="text-lg font-bold">Action update history</h2>
-            <div className="mt-4 space-y-2 text-sm text-slate-700">
-              {actionUpdates.length > 0 ? actionUpdates.map((update) => (
-                <div key={update.id} className="rounded-2xl bg-slate-50 p-3">
-                  <p className="font-bold capitalize">{statusLabel(update.status)}</p>
-                  <p className="mt-1 text-slate-600">{update.comment ?? "No comment."}</p>
-                  {update.closure_photo_id ? <p className="mt-2 text-xs font-semibold text-safety-green">Closure photo attached</p> : null}
-                  <p className="mt-2 text-xs text-slate-400">{new Date(update.created_at).toLocaleString()}</p>
-                </div>
-              )) : <p>No action updates yet.</p>}
-            </div>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <div className="flex items-center gap-2 text-lg font-bold"><LockKeyhole size={20} />Photo access control</div>
-            <p className="mt-2 text-sm text-slate-600">Photo files are stored in a private Supabase Storage bucket. The page does not store or expose permanent public image links.</p>
-          </Card>
-
-          {hazardPhoto ? (
-            <SecurePhotoPreview
-              reportNo={report.report_no}
-              photoId={hazardPhoto.id}
-              photoType="hazard"
-              viewerRole="ehs"
-              fileName={hazardPhoto.original_file_name}
-            />
-          ) : (
-            <Card>
-              <h2 className="flex items-center gap-2 text-lg font-bold"><ShieldCheck size={20} />No secure photo available</h2>
-              <p className="mt-2 text-sm text-slate-600">This report may have been created before Phase 2B Supabase Storage upload was enabled.</p>
-            </Card>
-          )}
-
-          <Card>
-            <h2 className="text-lg font-bold">Closure evidence for EHS review</h2>
-            <p className="mt-2 text-sm text-slate-600">Review closure photo evidence before accepting or reopening the action.</p>
-          </Card>
-
-          {closurePhotos.length > 0 ? closurePhotos.map((photo) => (
-            <SecurePhotoPreview
-              key={photo.id}
-              reportNo={report.report_no}
-              photoId={photo.id}
-              photoType="closure"
-              viewerRole="ehs"
-              fileName={photo.original_file_name}
-            />
-          )) : (
-            <Card>
-              <h2 className="text-lg font-bold">No closure evidence yet</h2>
-              <p className="mt-2 text-sm text-slate-600">Closure evidence appears here after the action owner submits the action for EHS verification.</p>
-            </Card>
-          )}
-
-          <Card>
-            <h2 className="text-lg font-bold">Stored photo records</h2>
-            <div className="mt-4 space-y-2 text-xs text-slate-600">
-              {photos.length > 0 ? photos.map((photo) => (
-                <div key={photo.id} className="rounded-2xl bg-slate-50 p-3">
-                  <p><strong>Type:</strong> {photo.photo_type}</p>
-                  <p><strong>Provider:</strong> {photo.storage_provider ?? "not set"}</p>
-                  <p><strong>File:</strong> {photo.original_file_name ?? "not set"}</p>
-                  <p className="break-all"><strong>Path:</strong> {photo.supabase_storage_path ?? "not set"}</p>
-                </div>
-              )) : <p>No photo records found.</p>}
-            </div>
-          </Card>
-        </div>
-      </section>
+            {assignment ? (
+              <EhsVerificationPanel
+                reportNo={report.report_no}
+                assignmentId={assignment.id}
+                reportStatus={report.status}
+                assignmentStatus={assignment.status}
+              />
+            ) : null}
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

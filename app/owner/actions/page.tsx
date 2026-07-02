@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Filter, LockKeyhole, UserCheck } from "lucide-react";
+import { ArrowRight, Clock3, Filter, UserCheck } from "lucide-react";
 import { Card } from "@/components/Card";
+import { ConsoleHeader } from "@/components/ConsoleHeader";
+import { EmptyState } from "@/components/EmptyState";
 import { MetricCard } from "@/components/MetricCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { getActionOwnerIdForUser, requireAppRole } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { statusLabel } from "@/lib/status";
 import type { ReportStatus, UrgencyLevel } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -99,112 +101,145 @@ async function getActions(ownerId?: string): Promise<{ actions: ActionItem[]; ow
       actions: [],
       owners: [],
       selectedOwnerId: null,
-      error: error instanceof Error ? error.message : "Unknown action owner dashboard error."
+      error: error instanceof Error ? error.message : "Actions could not be loaded."
     };
   }
 }
 
-export default async function ActionOwnerDashboardPage({ searchParams }: { searchParams?: Promise<{ ownerId?: string }> }) {
+const TABS = [
+  { key: "open", label: "Open" },
+  { key: "due-soon", label: "Due soon" },
+  { key: "overdue", label: "Overdue" },
+  { key: "verify", label: "Pending verification" },
+  { key: "closed", label: "Closed" }
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
+
+export default async function ActionOwnerDashboardPage({ searchParams }: { searchParams?: Promise<{ ownerId?: string; tab?: string }> }) {
   const profile = await requireAppRole(["admin", "ehs", "action_owner"], "/owner/actions");
   const params = searchParams ? await searchParams : {};
+  const tab: TabKey = (TABS.some((item) => item.key === params.tab) ? params.tab : "open") as TabKey;
   const forcedOwnerId = profile.appUser.role === "action_owner" ? await getActionOwnerIdForUser(profile.appUser.id) : null;
   const canSelectOwner = profile.appUser.role !== "action_owner";
   const { actions, owners, selectedOwnerId, error } = await getActions(forcedOwnerId ?? params.ownerId);
-  const overdue = actions.filter((action) => new Date(action.due_date) < new Date() && !["closed", "cancelled"].includes(action.assignment_status)).length;
-  const pendingVerification = actions.filter((action) => action.assignment_status === "pending_verification").length;
+
+  const now = new Date();
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 3);
+
+  const isClosed = (action: ActionItem) => ["closed", "cancelled"].includes(action.assignment_status);
+  const isOverdue = (action: ActionItem) => new Date(action.due_date) < now && !isClosed(action);
+  const filtered: Record<TabKey, ActionItem[]> = {
+    open: actions.filter((action) => !isClosed(action)),
+    "due-soon": actions.filter((action) => !isClosed(action) && new Date(action.due_date) >= now && new Date(action.due_date) <= soon),
+    overdue: actions.filter(isOverdue),
+    verify: actions.filter((action) => action.assignment_status === "pending_verification"),
+    closed: actions.filter(isClosed)
+  };
+  const list = filtered[tab];
+
+  const overdueCount = filtered.overdue.length;
+  const pendingVerification = filtered.verify.length;
   const inProgress = actions.filter((action) => action.assignment_status === "in_progress").length;
+
+  const ownerQuery = selectedOwnerId && canSelectOwner ? `&ownerId=${selectedOwnerId}` : "";
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
-      <header className="mb-6 rounded-3xl bg-safety-green p-6 text-white shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-green-100">Action owner console</p>
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">My assigned safety actions</h1>
-            <p className="mt-2 max-w-3xl text-sm text-green-50">Signed in as {profile.appUser.name}. Reporter name, phone number, employee ID, and company name are not loaded on this screen.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {profile.appUser.role === "action_owner" ? null : <Link href="/ehs/dashboard" className="rounded-2xl bg-white/15 px-4 py-3 text-sm font-semibold">EHS Dashboard</Link>}
-            <Link href="/auth/logout" className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-safety-green">Sign out</Link>
-          </div>
-        </div>
-      </header>
+      <div className="space-y-4">
+        <ConsoleHeader
+          eyebrow="Action Owner"
+          title="My Actions"
+          description={`Signed in as ${profile.appUser.name}. Reporter hidden for privacy.`}
+          actions={
+            <>
+              {profile.appUser.role === "action_owner" ? null : (
+                <Link href="/ehs/dashboard" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600">EHS Dashboard</Link>
+              )}
+              <Link href="/auth/logout" className="rounded-2xl bg-blue-800 px-3 py-2 text-sm font-semibold text-white">Sign out</Link>
+            </>
+          }
+        />
 
-      {error ? (
-        <div className="mb-4 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
-          Action dashboard warning: {error}
-        </div>
-      ) : null}
+        {error ? (
+          <div className="rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">Some actions could not be loaded: {error}</div>
+        ) : null}
 
-      {profile.appUser.role === "action_owner" && !forcedOwnerId ? (
-        <Card>
-          <h2 className="text-lg font-bold">No action owner profile linked</h2>
-          <p className="mt-2 text-sm text-slate-600">Your login exists, but no record was found in the action_owners table. Ask EHS/Admin to link your user record as an action owner.</p>
-        </Card>
-      ) : null}
-
-      <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="Assigned" value={actions.length} note="Visible for current owner" />
-        <MetricCard label="In progress" value={inProgress} note="Owner has started action" />
-        <MetricCard label="Pending verification" value={pendingVerification} note="Waiting for EHS review" />
-        <MetricCard label="Overdue" value={overdue} note="Due date passed" />
-      </section>
-
-      <section className={`mt-6 grid gap-6 ${canSelectOwner ? "lg:grid-cols-[0.9fr_1.4fr]" : "lg:grid-cols-[0.7fr_1.6fr]"}`}>
-        <div className="space-y-4">
-          {canSelectOwner ? (
-            <Card>
-              <h2 className="flex items-center gap-2 text-lg font-bold"><Filter size={18} /> Select action owner</h2>
-              <p className="mt-2 text-sm text-slate-600">EHS/Admin can review action owner queues. Action owners only see their own queue.</p>
-              <div className="mt-4 space-y-2">
-                {owners.length > 0 ? owners.map((owner) => (
-                  <Link
-                    key={owner.id}
-                    href={`/owner/actions?ownerId=${owner.id}`}
-                    className={`block rounded-2xl border p-3 text-sm transition ${selectedOwnerId === owner.id ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200 bg-white text-slate-700 hover:border-safety-green/40"}`}
-                  >
-                    <span className="font-bold">{owner.name}</span>
-                    <span className="mt-1 block text-xs text-slate-500">{owner.departmentName ?? owner.ownerLevel} · {owner.email ?? "No email"}</span>
-                  </Link>
-                )) : <p className="text-sm text-slate-600">No action owners found.</p>}
-              </div>
-            </Card>
-          ) : (
-            <Card>
-              <h2 className="flex items-center gap-2 text-lg font-bold"><UserCheck size={18} /> Your queue</h2>
-              <p className="mt-2 text-sm text-slate-600">Role-based access is active. You are only viewing actions assigned to your linked action owner profile.</p>
-            </Card>
-          )}
-
+        {profile.appUser.role === "action_owner" && !forcedOwnerId ? (
           <Card>
-            <h2 className="flex items-center gap-2 text-lg font-bold"><LockKeyhole size={18} /> Privacy check</h2>
-            <div className="mt-4 space-y-3 text-sm text-slate-700">
-              <p className="rounded-2xl bg-green-50 p-3 text-green-800"><CheckCircle2 className="mr-2 inline" size={16} /> Uses action-owner privacy view.</p>
-              <p className="rounded-2xl bg-amber-50 p-3 text-amber-800"><AlertTriangle className="mr-2 inline" size={16} /> Reporter identity is not selected or displayed.</p>
-            </div>
+            <h2 className="text-lg font-bold">No action owner profile linked</h2>
+            <p className="mt-2 text-sm text-slate-600">Your login works, but it is not linked as an action owner yet. Ask EHS or an admin to link your account.</p>
           </Card>
-        </div>
+        ) : null}
 
-        <div className="space-y-3">
-          <h2 className="text-xl font-bold">Assigned action list</h2>
-          {actions.length > 0 ? actions.map((action) => (
-            <ActionCard key={action.assignment_id} action={action} />
-          )) : (
-            <Card>
-              <h2 className="text-lg font-bold">No assigned actions</h2>
-              <p className="mt-2 text-sm text-slate-600">Assign a report from the EHS report detail page to see it here.</p>
-            </Card>
-          )}
-        </div>
-      </section>
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MetricCard label="Open" value={filtered.open.length} note="Assigned to this queue" />
+          <MetricCard label="In progress" value={inProgress} note="Work has started" />
+          <MetricCard label="Pending verification" value={pendingVerification} note="Waiting for EHS" />
+          <MetricCard label="Overdue" value={overdueCount} note="Past the due date" />
+        </section>
+
+        <nav className="flex flex-wrap gap-2" aria-label="Action filter">
+          {TABS.map((item) => {
+            const active = item.key === tab;
+            return (
+              <Link
+                key={item.key}
+                href={`/owner/actions?tab=${item.key}${ownerQuery}`}
+                aria-current={active ? "page" : undefined}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+                  active ? "bg-blue-800 text-white ring-blue-800" : "bg-white text-slate-600 ring-slate-200 hover:ring-blue-300"
+                }`}
+              >
+                {item.label} <span className={active ? "text-blue-100" : "text-slate-400"}>{filtered[item.key].length}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <section className={`grid gap-4 ${canSelectOwner ? "lg:grid-cols-[0.8fr_1.6fr]" : ""}`}>
+          {canSelectOwner ? (
+            <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+              <Card>
+                <h2 className="flex items-center gap-2 text-base font-bold"><Filter size={17} /> Action owner queues</h2>
+                <p className="mt-2 text-sm text-slate-600">EHS/Admin can review each owner&rsquo;s queue. Owners only see their own.</p>
+                <div className="mt-3 space-y-2">
+                  {owners.length > 0 ? owners.map((owner) => (
+                    <Link
+                      key={owner.id}
+                      href={`/owner/actions?tab=${tab}&ownerId=${owner.id}`}
+                      className={`block rounded-2xl border p-3 text-sm transition ${selectedOwnerId === owner.id ? "border-blue-800 bg-blue-50 text-blue-900" : "border-slate-200 bg-white text-slate-700 hover:border-blue-300"}`}
+                    >
+                      <span className="font-bold">{owner.name}</span>
+                      <span className="mt-1 block text-xs text-slate-500">{owner.departmentName ?? owner.ownerLevel}</span>
+                    </Link>
+                  )) : <p className="text-sm text-slate-600">No action owners found.</p>}
+                </div>
+              </Card>
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            {list.length > 0 ? (
+              list.map((action) => <ActionCard key={action.assignment_id} action={action} overdue={isOverdue(action)} />)
+            ) : (
+              <EmptyState
+                icon={<UserCheck size={20} />}
+                title="Nothing here"
+                description="Actions matching this filter will appear here."
+              />
+            )}
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
 
-function ActionCard({ action }: { action: ActionItem }) {
+function ActionCard({ action, overdue }: { action: ActionItem; overdue: boolean }) {
   const urgency = action.final_urgency ?? action.ai_urgency ?? "medium";
   const location = action.location_name ? `${action.location_area ?? ""} - ${action.location_name}` : action.location_text ?? "Location not set";
-  const isOverdue = new Date(action.due_date) < new Date() && !["closed", "cancelled"].includes(action.assignment_status);
 
   return (
     <Link href={`/owner/actions/${action.assignment_id}`}>
@@ -213,8 +248,8 @@ function ActionCard({ action }: { action: ActionItem }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{action.report_no}</span>
-              <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold capitalize text-safety-green">{urgency}</span>
-              {isOverdue ? <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">Overdue</span> : null}
+              <StatusBadge value={urgency} />
+              {overdue ? <StatusBadge value="overdue" /> : null}
             </div>
             <h3 className="mt-3 text-lg font-bold text-safety-ink">{action.ai_hazard_summary ?? action.original_description}</h3>
             <p className="mt-2 text-sm text-slate-600">{location}</p>
@@ -222,8 +257,8 @@ function ActionCard({ action }: { action: ActionItem }) {
           </div>
           <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700 md:min-w-44">
             <p className="flex items-center gap-2"><Clock3 size={15} /> Due {action.due_date}</p>
-            <p className="mt-2 font-bold capitalize">{statusLabel(action.assignment_status)}</p>
-            <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-safety-green">Open action <ArrowRight size={14} /></p>
+            <div className="mt-2"><StatusBadge value={action.assignment_status} /></div>
+            <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-800">Update Action <ArrowRight size={14} /></p>
           </div>
         </div>
       </Card>

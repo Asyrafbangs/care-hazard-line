@@ -63,12 +63,10 @@ export function SecurePhotoPreview({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-            <ShieldCheck size={14} /> Secure photo evidence
+            <ShieldCheck size={14} /> Protected Photo
           </p>
           <h3 className="mt-1 text-base font-bold text-safety-ink">{fileName ?? "Hazard photo"}</h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Private Supabase Storage file. A temporary signed URL is generated only when viewed.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Stored privately. Only opened when you view it.</p>
         </div>
         <ImageIcon className="text-slate-400" />
       </div>
@@ -80,7 +78,7 @@ export function SecurePhotoPreview({
         </div>
       ) : (
         <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-600">
-          Photo is protected. Click view to generate a short-lived access link.
+          Photo is protected. Tap View Photo to open it.
         </div>
       )}
 
@@ -93,7 +91,7 @@ export function SecurePhotoPreview({
       <div className="mt-4 flex gap-2">
         <Button onClick={loadPhoto} disabled={isLoading} className="gap-2">
           {signedUrl ? <RefreshCw size={16} /> : <Eye size={16} />}
-          {isLoading ? "Loading..." : signedUrl ? "Refresh secure link" : "View photo"}
+          {isLoading ? "Loading..." : signedUrl ? "Refresh" : "View Photo"}
         </Button>
       </div>
     </div>
