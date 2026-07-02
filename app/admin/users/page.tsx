@@ -16,12 +16,12 @@ export default async function AdminUsersPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-6">
-      <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green">
+      <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-800">
         <ArrowLeft size={16} /> Back to dashboard
       </Link>
 
       <header className="mb-6 rounded-3xl bg-white p-6 shadow-card ring-1 ring-slate-100">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-safety-green">Admin</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Admin</p>
         <h1 className="mt-2 text-3xl font-bold">User management</h1>
         <p className="mt-2 text-sm text-slate-600">
           Register internal users, set their roles, activate/deactivate access, and reset passwords for EHS, action

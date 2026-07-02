@@ -71,7 +71,7 @@ export default function ResetPasswordPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-8">
       <Card>
-        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 text-safety-green">
+        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-800">
           <LockKeyhole size={28} />
         </div>
         <h1 className="text-2xl font-bold">Set a new password</h1>
@@ -84,7 +84,7 @@ export default function ResetPasswordPage() {
               This reset link is invalid or has expired. Go back to login and tap &ldquo;Forgot password?&rdquo; to get a
               fresh link.
             </p>
-            <Link href="/login" className="block text-center text-sm font-semibold text-safety-green underline">
+            <Link href="/login" className="block text-center text-sm font-semibold text-blue-800 underline">
               Back to login
             </Link>
           </div>

@@ -49,28 +49,31 @@ export async function POST(request: Request) {
     const supabase = createSupabaseAdmin();
     const candidates = phoneCandidates(payload.phoneNumber);
 
+    // The same person may have more than one reporter row (e.g. created once via
+    // WhatsApp and once via the web form with a different phone format). Match
+    // every reporter row for the candidate numbers so all their reports show.
     const { data: reporters, error: reporterError } = await supabase
       .from("reporters")
       .select("id, name, preferred_language")
-      .in("phone_number", candidates)
-      .limit(1);
+      .in("phone_number", candidates);
 
     if (reporterError) {
       return NextResponse.json({ ok: false, error: reporterError.message }, { status: 500 });
     }
 
     const reporter = reporters?.[0];
+    const reporterIds = (reporters ?? []).map((row) => row.id);
 
-    if (!reporter) {
+    if (!reporter || reporterIds.length === 0) {
       return NextResponse.json({ ok: true, reporterFound: false, reports: [] });
     }
 
     let reportQuery = supabase
       .from("hazard_reports")
       .select("id, report_no, original_description, ai_hazard_summary, location_text, status, final_urgency, ai_urgency, submitted_at, closed_at, updated_at, created_at")
-      .eq("reporter_id", reporter.id)
+      .in("reporter_id", reporterIds)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(25);
 
     if (payload.reportNo) {
       reportQuery = reportQuery.eq("report_no", payload.reportNo.trim().toUpperCase());
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
           .from("notifications")
           .select("id, report_id, channel, template_key, message_preview, status, created_at")
           .eq("recipient_type", "reporter")
-          .eq("recipient_reporter_id", reporter.id)
+          .in("recipient_reporter_id", reporterIds)
           .in("report_id", reportIds)
           .order("created_at", { ascending: false })
       : { data: [] };

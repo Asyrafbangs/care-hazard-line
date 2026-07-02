@@ -202,7 +202,7 @@ export function ReportFlow() {
             <p className="mt-1 rounded-2xl bg-green-50 px-6 py-3 text-2xl font-bold text-safety-green">{submittedReportNo}</p>
             <p className="mt-3 max-w-sm text-sm text-slate-500">Keep this ID to track your report status anytime.</p>
             <div className="mt-6 grid w-full gap-3 sm:max-w-sm">
-              <Link href="/track" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-safety-green px-5 py-3 text-base font-bold text-white">
+              <Link href="/track" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-blue-800 px-5 py-3 text-base font-bold text-white">
                 <Search size={18} /> Track My Report
               </Link>
               <button
@@ -385,8 +385,8 @@ export function ReportFlow() {
                   <input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-safety-green" placeholder="Example: 60123456789" />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setCategory("employee")} className={`min-h-11 rounded-2xl border p-3 text-sm font-semibold ${category === "employee" ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200 text-slate-600"}`}>Employee</button>
-                  <button type="button" onClick={() => setCategory("visitor")} className={`min-h-11 rounded-2xl border p-3 text-sm font-semibold ${category === "visitor" ? "border-safety-green bg-green-50 text-safety-green" : "border-slate-200 text-slate-600"}`}>Visitor</button>
+                  <button type="button" onClick={() => setCategory("employee")} className={`min-h-11 rounded-2xl border p-3 text-sm font-semibold ${category === "employee" ? "border-blue-800 bg-blue-50 text-blue-800" : "border-slate-200 text-slate-600"}`}>Employee</button>
+                  <button type="button" onClick={() => setCategory("visitor")} className={`min-h-11 rounded-2xl border p-3 text-sm font-semibold ${category === "visitor" ? "border-blue-800 bg-blue-50 text-blue-800" : "border-slate-200 text-slate-600"}`}>Visitor</button>
                 </div>
                 {category === "employee" ? (
                   <label className="block text-sm font-semibold">

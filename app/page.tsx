@@ -12,7 +12,7 @@ export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col bg-safety-soft px-4 py-6 safe-area">
       {/* Branding */}
-      <header className="rounded-3xl bg-safety-green p-6 text-white shadow-card">
+      <header className="rounded-3xl bg-blue-800 p-6 text-white shadow-card">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-100">CARE Hazard Line</p>
         <h1 className="mt-2 text-2xl font-bold leading-tight">{tr("tagline")}</h1>
       </header>
@@ -20,7 +20,7 @@ export default function HomePage() {
       {/* Main message */}
       <section className="mt-5 rounded-3xl bg-white p-6 text-center shadow-card ring-1 ring-slate-100">
         <h2 className="text-xl font-bold text-safety-ink">{tr("seeUnsafe")}</h2>
-        <p className="mt-1 text-lg font-semibold text-safety-green">{tr("reportItHere")}</p>
+        <p className="mt-1 text-lg font-semibold text-blue-800">{tr("reportItHere")}</p>
 
         {/* Emergency warning — shown before the report button */}
         <div className="mt-4 flex gap-3 rounded-2xl bg-red-50 p-4 text-left ring-1 ring-red-100">
@@ -32,13 +32,13 @@ export default function HomePage() {
         <div className="mt-5 grid gap-3">
           <Link
             href="/reports/new"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-safety-green px-5 py-4 text-base font-bold text-white shadow-card transition active:scale-[0.99]"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-800 px-5 py-4 text-base font-bold text-white shadow-card transition active:scale-[0.99]"
           >
             <Camera size={20} /> {tr("reportSafetyIssue")}
           </Link>
           <Link
             href="/track"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-safety-green bg-white px-5 py-4 text-base font-bold text-safety-green transition active:scale-[0.99]"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-blue-800 bg-white px-5 py-4 text-base font-bold text-blue-800 transition active:scale-[0.99]"
           >
             <Search size={20} /> {tr("trackMyReport")}
           </Link>
@@ -50,7 +50,7 @@ export default function HomePage() {
 
       {/* Language selector */}
       <section className="mt-4 rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-100">
-        <p className={`text-sm font-semibold ${firstVisit ? "text-safety-green" : "text-safety-ink"}`}>
+        <p className={`text-sm font-semibold ${firstVisit ? "text-blue-800" : "text-safety-ink"}`}>
           {t(language, "chooseLanguage").text}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -60,7 +60,7 @@ export default function HomePage() {
               onClick={() => setLanguage(item.code)}
               className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
                 item.code === language
-                  ? "border-safety-green bg-green-50 text-safety-green"
+                  ? "border-blue-800 bg-blue-50 text-blue-800"
                   : "border-slate-200 bg-white text-slate-600"
               }`}
             >

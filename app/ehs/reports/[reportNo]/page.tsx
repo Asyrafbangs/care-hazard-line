@@ -219,7 +219,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
   if (!report) {
     return (
       <main className="mx-auto min-h-screen max-w-5xl px-4 py-6">
-        <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green"><ArrowLeft size={16} />Back to dashboard</Link>
+        <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-800"><ArrowLeft size={16} />Back to dashboard</Link>
         <Card>
           <h1 className="text-2xl font-bold">Report not found</h1>
           <p className="mt-2 text-sm text-slate-600">{error ?? "The report could not be loaded."}</p>

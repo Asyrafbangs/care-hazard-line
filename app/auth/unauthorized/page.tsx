@@ -14,7 +14,7 @@ export default function UnauthorizedPage() {
           Your login is valid, but your assigned role is not allowed to open this page.
         </p>
         <div className="mt-5 grid gap-2">
-          <Link href="/ehs/dashboard" className="rounded-2xl bg-safety-green px-4 py-3 text-center text-sm font-semibold text-white">Go to dashboard</Link>
+          <Link href="/ehs/dashboard" className="rounded-2xl bg-blue-800 px-4 py-3 text-center text-sm font-semibold text-white">Go to dashboard</Link>
           <Link href="/auth/logout" className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-700">Sign out</Link>
         </div>
       </Card>

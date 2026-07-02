@@ -128,7 +128,7 @@ export function ReporterTrackFlow() {
           <p className="text-sm text-slate-600">
             {result.reporterFound ? `Showing reports for ${result.reporter?.name ?? "you"}.` : "No matching reports."}
           </p>
-          <button onClick={reset} className="text-sm font-semibold text-safety-green underline">Search again</button>
+          <button onClick={reset} className="text-sm font-semibold text-blue-800 underline">Search again</button>
         </div>
       )}
 
@@ -137,7 +137,7 @@ export function ReporterTrackFlow() {
           title="No report found"
           description="We could not find a report for that phone number. Check the number, or contact EHS."
           action={
-            <Link href="/reports/new" className="inline-flex items-center gap-2 rounded-2xl bg-safety-green px-4 py-2.5 text-sm font-bold text-white">
+            <Link href="/reports/new" className="inline-flex items-center gap-2 rounded-2xl bg-blue-800 px-4 py-2.5 text-sm font-bold text-white">
               <Camera size={16} /> Report a hazard
             </Link>
           }

@@ -46,12 +46,12 @@ export default async function SystemHealthPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-4 py-6">
-      <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green">
+      <Link href="/ehs/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-800">
         <ArrowLeft size={16} /> Back to dashboard
       </Link>
 
       <header className="mb-6 rounded-3xl bg-white p-6 shadow-card ring-1 ring-slate-100">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-safety-green">Admin · System</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Admin · System</p>
         <h1 className="mt-2 text-3xl font-bold">System health</h1>
         <p className="mt-2 text-sm text-slate-600">
           Build, environment, and API status. Only configuration presence is shown — never the secret values.
@@ -88,9 +88,9 @@ export default async function SystemHealthPage() {
         <h2 className="text-lg font-bold">Live checks</h2>
         <p className="mt-2 text-sm text-slate-600">Open these endpoints for live diagnostics:</p>
         <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
-          <a href="/api/health" target="_blank" rel="noreferrer" className="rounded-2xl bg-green-50 px-4 py-2 text-safety-green">/api/health</a>
-          <a href="/api/whatsapp/production-check" target="_blank" rel="noreferrer" className="rounded-2xl bg-green-50 px-4 py-2 text-safety-green">/api/whatsapp/production-check</a>
-          <a href="/api/db-check" target="_blank" rel="noreferrer" className="rounded-2xl bg-green-50 px-4 py-2 text-safety-green">/api/db-check</a>
+          <a href="/api/health" target="_blank" rel="noreferrer" className="rounded-2xl bg-blue-50 px-4 py-2 text-blue-800">/api/health</a>
+          <a href="/api/whatsapp/production-check" target="_blank" rel="noreferrer" className="rounded-2xl bg-blue-50 px-4 py-2 text-blue-800">/api/whatsapp/production-check</a>
+          <a href="/api/db-check" target="_blank" rel="noreferrer" className="rounded-2xl bg-blue-50 px-4 py-2 text-blue-800">/api/db-check</a>
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold">
           <Link href="/dev/whatsapp-simulator" className="rounded-2xl bg-slate-100 px-4 py-2 text-slate-700">WhatsApp Simulator</Link>

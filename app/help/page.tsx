@@ -19,11 +19,11 @@ export default function HelpPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col bg-safety-soft px-4 py-6 safe-area">
-      <Link href="/" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-safety-green">
+      <Link href="/" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-800">
         <ArrowLeft size={16} /> CARE Hazard Line
       </Link>
 
-      <header className="rounded-3xl bg-safety-green p-6 text-white shadow-card">
+      <header className="rounded-3xl bg-blue-800 p-6 text-white shadow-card">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-100">{tr("getHelp")}</p>
         <h1 className="mt-2 text-2xl font-bold">{tr("reportHazard")}</h1>
       </header>
@@ -32,7 +32,7 @@ export default function HelpPage() {
         <ol className="space-y-3">
           {steps.map((step, index) => (
             <li key={index} className="flex gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-50 text-sm font-bold text-safety-green">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-800">
                 {index + 1}
               </span>
               <p className="pt-0.5 text-sm text-slate-700">{step}</p>
@@ -49,13 +49,13 @@ export default function HelpPage() {
       <div className="mt-4 grid gap-3">
         <Link
           href="/reports/new"
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-safety-green px-5 py-4 text-base font-bold text-white shadow-card"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-800 px-5 py-4 text-base font-bold text-white shadow-card"
         >
           <Camera size={20} /> {tr("reportSafetyIssue")}
         </Link>
         <Link
           href="/track"
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-safety-green bg-white px-5 py-4 text-base font-bold text-safety-green"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-blue-800 bg-white px-5 py-4 text-base font-bold text-blue-800"
         >
           <Search size={20} /> {tr("trackMyReport")}
         </Link>

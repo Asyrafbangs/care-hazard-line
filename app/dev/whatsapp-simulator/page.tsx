@@ -13,7 +13,7 @@ export default async function WhatsAppSimulatorPage() {
       <div className="space-y-4">
         <Card>
           <div className="flex gap-3">
-            <MessageCircle className="mt-1 text-safety-green" size={22} />
+            <MessageCircle className="mt-1 text-blue-800" size={22} />
             <div>
               <h2 className="text-lg font-bold">Local bot test</h2>
               <p className="mt-1 text-sm text-slate-600">

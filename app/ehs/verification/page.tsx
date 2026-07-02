@@ -110,7 +110,7 @@ function VerificationCard({ item }: { item: VerificationItem }) {
           </div>
           <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700"><strong>Required action:</strong> {item.action_required}</p>
         </div>
-        <Link href={`/ehs/reports/${encodeURIComponent(item.report_no)}`} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-safety-green px-4 py-3 text-sm font-semibold text-white">
+        <Link href={`/ehs/reports/${encodeURIComponent(item.report_no)}`} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-800 px-4 py-3 text-sm font-semibold text-white">
           View Evidence <ArrowRight size={16} />
         </Link>
       </div>

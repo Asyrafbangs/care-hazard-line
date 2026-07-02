@@ -14,7 +14,7 @@ export default function ReporterTrackingPage() {
           description="Check the status of a hazard you reported."
           tutorialHref="/help"
           actions={
-            <Link href="/reports/new" className="inline-flex items-center gap-1 rounded-2xl bg-safety-green px-3 py-2 text-sm font-semibold text-white">
+            <Link href="/reports/new" className="inline-flex items-center gap-1 rounded-2xl bg-blue-800 px-3 py-2 text-sm font-semibold text-white">
               <Camera size={16} /> Report a hazard
             </Link>
           }
