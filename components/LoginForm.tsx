@@ -1,13 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AlertTriangle, CheckCircle2, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/Button";
 import { createClient } from "@/lib/supabase-client";
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => searchParams.get("next") || "/login", [searchParams]);
   const [email, setEmail] = useState("");
@@ -36,8 +35,10 @@ export function LoginForm() {
       }
 
       setMessage({ type: "success", text: "Signed in. Opening your console..." });
-      router.refresh();
-      router.replace(nextPath.startsWith("/") ? nextPath : "/login");
+      // Full-page navigation (not client-side) so the auth cookies are fully
+      // committed and the server establishes the session in a single clean
+      // request. Avoids the client-nav session race that could log users out.
+      window.location.assign(nextPath.startsWith("/") ? nextPath : "/login");
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Login failed." });
     } finally {
