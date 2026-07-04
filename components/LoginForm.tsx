@@ -117,7 +117,7 @@ export function LoginForm() {
         type="button"
         onClick={sendReset}
         disabled={isSubmitting}
-        className="w-full text-center text-sm font-semibold text-safety-green underline disabled:opacity-50"
+        className="w-full text-center text-sm font-semibold text-blue-800 underline disabled:opacity-50"
       >
         Forgot password?
       </button>
